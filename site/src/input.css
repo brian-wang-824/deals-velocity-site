@@ -2,14 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-  .velocity-badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+@layer base {
+  html {
+    color-scheme: dark;
   }
-  .velocity-surging { @apply bg-red-100 text-red-700; }
-  .velocity-hot { @apply bg-orange-100 text-orange-700; }
-  .velocity-warming { @apply bg-amber-100 text-amber-700; }
-  .velocity-slow { @apply bg-yellow-50 text-yellow-700; }
-  .velocity-flat { @apply bg-gray-100 text-gray-600; }
-  .velocity-cooling { @apply bg-blue-50 text-blue-600; }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 28rem),
+      linear-gradient(180deg, #09090b 0%, #18181b 100%);
+  }
+}
+
+@layer components {
+  .control-field {
+    @apply h-11 rounded-md border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/20;
+  }
+
+  .deal-card {
+    @apply overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/80 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900;
+  }
+
+  .deal-card strong {
+    @apply block truncate font-semibold text-zinc-100;
+  }
+
+  .deal-card small {
+    @apply block truncate text-[0.65rem] uppercase tracking-wide text-zinc-500;
+  }
+
+  .velocity-badge {
+    @apply inline-flex max-w-24 items-center rounded px-2 py-1 text-[0.65rem] font-bold uppercase leading-none tracking-wide;
+  }
+
+  .velocity-surging { @apply bg-red-400 text-zinc-950; }
+  .velocity-hot { @apply bg-orange-300 text-zinc-950; }
+  .velocity-warming { @apply bg-amber-300 text-zinc-950; }
+  .velocity-slow { @apply bg-yellow-200 text-zinc-950; }
+  .velocity-flat { @apply bg-zinc-700 text-zinc-200; }
+  .velocity-cooling { @apply bg-sky-300 text-zinc-950; }
+  .velocity-pending { @apply bg-violet-300 text-zinc-950; }
 }

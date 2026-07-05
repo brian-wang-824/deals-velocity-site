@@ -6,29 +6,36 @@
   <title>Slickdeals Velocity Tracker</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
-  <header class="border-b bg-white">
-    <div class="mx-auto max-w-5xl px-4 py-5 flex items-center justify-between flex-wrap gap-2">
-      <div>
-        <h1 class="text-xl font-semibold">Slickdeals Velocity Tracker</h1>
-        <p class="text-sm text-gray-500">Frontpage deals ranked by thumbs-up velocity</p>
-      </div>
-      <div class="text-sm text-gray-500 text-right">
-        <div id="last-updated"></div>
-        <div id="next-refresh" class="font-medium"></div>
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+  <header class="border-b border-zinc-800 bg-zinc-950/95">
+    <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+      <nav class="mb-5 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+        <span class="text-emerald-300">Velocity</span>
+        <span>Current Deals</span>
+        <span>Frontpage</span>
+      </nav>
+      <div class="flex items-end justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-semibold text-white sm:text-4xl">Slickdeals Velocity Tracker</h1>
+          <p class="mt-2 max-w-2xl text-sm text-zinc-400">A 5x5 catalog of frontpage deals ranked by thumbs-up velocity.</p>
+        </div>
+        <div class="shrink-0 text-right text-xs text-zinc-500 sm:text-sm">
+          <div id="last-updated"></div>
+          <div id="next-refresh" class="font-medium text-zinc-300"></div>
+        </div>
       </div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-5xl px-4 py-6">
-    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div class="mb-5 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
       <input
         id="search"
         type="search"
-        placeholder="Search deals or stores…"
-        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+        placeholder="Search deals or stores..."
+        class="control-field"
       />
-      <select id="velocity-filter" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      <select id="velocity-filter" class="control-field">
         <option value="all">All velocities</option>
         <option value="surging">Surging</option>
         <option value="hot">Hot</option>
@@ -37,7 +44,7 @@
         <option value="flat">Flat</option>
         <option value="cooling">Cooling</option>
       </select>
-      <select id="sort" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      <select id="sort" class="control-field">
         <option value="velocity">Sort: Velocity</option>
         <option value="votes">Sort: Votes</option>
         <option value="comments">Sort: Comments</option>
@@ -46,9 +53,9 @@
       </select>
     </div>
 
-    <div id="deals-list" class="grid gap-3"></div>
-
-    <div id="pagination" class="flex items-center justify-center gap-2 mt-6"></div>
+    <div id="results-meta" class="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-zinc-500"></div>
+    <div id="deals-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"></div>
+    <div id="pagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
   </main>
 
   <script src="/app.js"></script>

@@ -13,6 +13,7 @@ const els = {
   sort: document.getElementById("sort"),
   dealsList: document.getElementById("deals-list"),
   pagination: document.getElementById("pagination"),
+  resultsMeta: document.getElementById("results-meta"),
   lastUpdated: document.getElementById("last-updated"),
   nextRefresh: document.getElementById("next-refresh"),
 };
@@ -41,8 +42,19 @@ function velocityBadgeClass(label) {
     slow: "velocity-slow",
     flat: "velocity-flat",
     cooling: "velocity-cooling",
+    "needs second scrape": "velocity-pending",
   };
   return map[label] || "velocity-flat";
+}
+
+function formatDiscount(value) {
+  if (value == null || Number.isNaN(Number(value)) || Number(value) <= 0) return "";
+  return `-${Math.round(Number(value))}%`;
+}
+
+function formatVelocity(value) {
+  if (value == null || Number.isNaN(Number(value))) return "pending";
+  return `${Number(value).toFixed(1)}/hr`;
 }
 
 function applyFiltersAndSort() {
@@ -76,37 +88,49 @@ function renderDeals() {
   currentPage = Math.min(currentPage, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageItems = filtered.slice(start, start + PAGE_SIZE);
+  const end = Math.min(start + pageItems.length, filtered.length);
+
+  els.resultsMeta.textContent = filtered.length
+    ? `Showing ${start + 1}-${end} of ${filtered.length} deals`
+    : "No matching deals";
 
   if (pageItems.length === 0) {
-    els.dealsList.innerHTML = `<p class="text-center text-gray-500 py-12">No deals match your filters.</p>`;
+    els.dealsList.innerHTML = `<p class="col-span-full py-16 text-center text-sm text-zinc-500">No deals match your filters.</p>`;
   } else {
-    els.dealsList.innerHTML = pageItems
-      .map(
-        (d) => `
-      <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener"
-         class="flex gap-3 rounded-lg border border-gray-200 bg-white p-3 hover:border-gray-300 hover:shadow-sm transition">
-        <img src="${escapeHtml(d.image_url || "")}" alt="" loading="lazy"
-             class="h-16 w-16 rounded-md object-cover bg-gray-100 flex-shrink-0" />
-        <div class="min-w-0 flex-1">
-          <div class="flex items-start justify-between gap-2">
-            <p class="text-sm font-medium truncate">${escapeHtml(d.title)}</p>
-            <span class="velocity-badge ${velocityBadgeClass(d.velocity_label)} flex-shrink-0">${escapeHtml(d.velocity_label)}</span>
-          </div>
-          <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(d.store || "")}</p>
-          <div class="flex items-center gap-3 mt-1 text-xs text-gray-600">
-            <span>${d.price ? escapeHtml(d.price) : ""}</span>
-            ${d.discount_percentage ? `<span class="text-green-700">-${d.discount_percentage}%</span>` : ""}
-            <span>👍 ${d.votes}</span>
-            <span>💬 ${d.comments}</span>
-            ${d.recent_velocity != null ? `<span>${d.recent_velocity}/hr</span>` : ""}
-          </div>
-        </div>
-      </a>`
-      )
-      .join("");
+    els.dealsList.innerHTML = pageItems.map(renderDealCard).join("");
   }
 
   renderPagination(totalPages);
+}
+
+function renderDealCard(d) {
+  const discount = formatDiscount(d.discount_percentage);
+
+  return `
+    <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener" class="deal-card group">
+      <div class="relative aspect-square overflow-hidden border-b border-zinc-800 bg-zinc-900">
+        <img src="${escapeHtml(d.image_url || "")}" alt="" loading="lazy"
+             class="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+        ${discount ? `<span class="absolute left-2 top-2 rounded bg-emerald-400 px-2 py-1 text-xs font-bold text-zinc-950">${discount}</span>` : ""}
+      </div>
+      <div class="flex min-h-40 flex-col gap-3 p-3">
+        <div class="flex items-start justify-between gap-2">
+          <p class="line-clamp-3 text-sm font-semibold leading-5 text-zinc-100">${escapeHtml(d.title)}</p>
+          <span class="velocity-badge ${velocityBadgeClass(d.velocity_label)} shrink-0">${escapeHtml(d.velocity_label)}</span>
+        </div>
+        <div class="mt-auto space-y-3">
+          <div>
+            <p class="text-xl font-semibold text-white">${d.price ? escapeHtml(d.price) : "See deal"}</p>
+            <p class="truncate text-xs text-zinc-500">${escapeHtml(d.store || "Unknown store")}</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-3 text-xs">
+            <span><strong>${d.votes ?? 0}</strong><small>votes</small></span>
+            <span><strong>${d.comments ?? 0}</strong><small>talk</small></span>
+            <span><strong>${formatVelocity(d.recent_velocity)}</strong><small>velocity</small></span>
+          </div>
+        </div>
+      </div>
+    </a>`;
 }
 
 function renderPagination(totalPages) {
@@ -117,8 +141,10 @@ function renderPagination(totalPages) {
   const buttons = [];
   for (let p = 1; p <= totalPages; p++) {
     buttons.push(
-      `<button data-page="${p}" class="px-3 py-1 rounded-md text-sm ${
-        p === currentPage ? "bg-gray-900 text-white" : "bg-white border border-gray-300"
+      `<button data-page="${p}" class="rounded-md px-3 py-1 text-sm transition ${
+        p === currentPage
+          ? "bg-emerald-300 text-zinc-950"
+          : "border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
       }">${p}</button>`
     );
   }
@@ -141,7 +167,7 @@ function renderCountdown() {
     const msLeft = nextRefresh - Date.now();
     els.lastUpdated.textContent = `Updated ${formatRelativeTime(scrapedAtIso)}`;
     if (msLeft <= 0) {
-      els.nextRefresh.textContent = "Refreshing shortly…";
+      els.nextRefresh.textContent = "Refreshing shortly...";
       return;
     }
     const mins = Math.floor(msLeft / 60_000);
@@ -168,7 +194,7 @@ async function loadDeals({ silent = false } = {}) {
     renderCountdown();
   } catch (err) {
     if (!silent) {
-      els.dealsList.innerHTML = `<p class="text-center text-red-600 py-12">Couldn't load deals data. Try refreshing the page.</p>`;
+      els.dealsList.innerHTML = `<p class="col-span-full py-16 text-center text-sm text-red-300">Couldn't load deals data. Try refreshing the page.</p>`;
     }
     console.error("Failed to load deals.json", err);
   }
