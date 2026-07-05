@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .velocity-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .velocity-surging { @apply bg-red-100 text-red-700; }
+  .velocity-hot { @apply bg-orange-100 text-orange-700; }
+  .velocity-warming { @apply bg-amber-100 text-amber-700; }
+  .velocity-slow { @apply bg-yellow-50 text-yellow-700; }
+  .velocity-flat { @apply bg-gray-100 text-gray-600; }
+  .velocity-cooling { @apply bg-blue-50 text-blue-600; }
+}

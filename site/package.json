@@ -1,0 +1,11 @@
+{
+  "name": "deals-velocity-site",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i ./src/input.css -o ./dist/style.css --minify && mkdir -p dist/data && cp src/index.html dist/index.html && cp public/app.js dist/app.js && cp public/data/deals.json dist/data/deals.json 2>/dev/null || true",
+    "dev": "tailwindcss -i ./src/input.css -o ./public/style.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

@@ -1,0 +1,8 @@
+# Everything needed to run the scraper itself:
+-r requirements-scraper.txt
+
+# No separate test framework dependency: the test suite in tests/ uses
+# Python's built-in `unittest` (including unittest.IsolatedAsyncioTestCase
+# for the async tests), so `python -m unittest discover` works with zero
+# extra installs. If you prefer pytest, it auto-discovers unittest.TestCase
+# classes too -- `pip install pytest && pytest tests/` works as-is.

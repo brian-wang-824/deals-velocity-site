@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slickdeals Velocity Tracker</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+  <header class="border-b bg-white">
+    <div class="mx-auto max-w-5xl px-4 py-5 flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <h1 class="text-xl font-semibold">Slickdeals Velocity Tracker</h1>
+        <p class="text-sm text-gray-500">Frontpage deals ranked by thumbs-up velocity</p>
+      </div>
+      <div class="text-sm text-gray-500 text-right">
+        <div id="last-updated"></div>
+        <div id="next-refresh" class="font-medium"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-5xl px-4 py-6">
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <input
+        id="search"
+        type="search"
+        placeholder="Search deals or stores…"
+        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+      />
+      <select id="velocity-filter" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <option value="all">All velocities</option>
+        <option value="surging">Surging</option>
+        <option value="hot">Hot</option>
+        <option value="warming">Warming</option>
+        <option value="slow">Slow</option>
+        <option value="flat">Flat</option>
+        <option value="cooling">Cooling</option>
+      </select>
+      <select id="sort" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        <option value="velocity">Sort: Velocity</option>
+        <option value="votes">Sort: Votes</option>
+        <option value="comments">Sort: Comments</option>
+        <option value="title">Sort: Title</option>
+        <option value="posted">Sort: Newest</option>
+      </select>
+    </div>
+
+    <div id="deals-list" class="grid gap-3"></div>
+
+    <div id="pagination" class="flex items-center justify-center gap-2 mt-6"></div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

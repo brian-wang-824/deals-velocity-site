@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+
+# Site build output and node deps
+site/node_modules/
+site/dist/
+site/public/style.css

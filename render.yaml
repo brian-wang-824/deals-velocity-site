@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: deals-velocity-site
+    runtime: static
+    buildCommand: cd site && npm install && npm run build
+    staticPublishPath: site/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /data/*.json
+        name: Cache-Control
+        value: no-cache
