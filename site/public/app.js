@@ -1,6 +1,13 @@
 const REFRESH_INTERVAL_MINUTES = 10;
 const PAGE_SIZE = 25;
 const POLL_FOR_NEW_DATA_MS = 60_000; // check for a fresh deals.json every minute
+const POSTED_WINDOW_HOURS = {
+  "3h": 3,
+  "6h": 6,
+  "9h": 9,
+  "12h": 12,
+  "24h": 24,
+};
 const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const POST_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   month: "short",
@@ -20,6 +27,7 @@ const els = HAS_DOCUMENT
   ? {
       search: document.getElementById("search"),
       sort: document.getElementById("sort"),
+      postedWindow: document.getElementById("posted-window"),
       dealsList: document.getElementById("deals-list"),
       pagination: document.getElementById("pagination"),
       resultsMeta: document.getElementById("results-meta"),
@@ -66,6 +74,16 @@ function sortDealsByNewest(deals) {
       return a.index - b.index;
     })
     .map(({ deal }) => deal);
+}
+
+function filterDealsByPostedWindow(deals, windowKey = "12h", nowMs = Date.now()) {
+  const hours = POSTED_WINDOW_HOURS[windowKey] ?? POSTED_WINDOW_HOURS["12h"];
+
+  const cutoff = nowMs - hours * 60 * 60 * 1000;
+  return deals.filter((deal) => {
+    const postedMs = getPostTimeMs(deal.posted_time);
+    return postedMs !== Number.NEGATIVE_INFINITY && postedMs >= cutoff && postedMs <= nowMs;
+  });
 }
 
 function velocityBadgeClass(label) {
@@ -151,8 +169,9 @@ function renderVoteMetric(d) {
 function applyFiltersAndSort() {
   const q = els.search.value.trim().toLowerCase();
   const sort = els.sort.value;
+  const postedWindow = els.postedWindow.value;
 
-  let filtered = allDeals;
+  let filtered = filterDealsByPostedWindow(allDeals, postedWindow);
   if (q) {
     filtered = filtered.filter(
       (d) => d.title.toLowerCase().includes(q) || (d.store || "").toLowerCase().includes(q)
@@ -199,7 +218,7 @@ function renderDealCard(d) {
       <div class="flex min-h-40 flex-col gap-3 p-3">
         <div class="deal-title-row">
           <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener"
-             class="line-clamp-3 text-sm font-semibold leading-5 text-zinc-100 transition hover:text-emerald-300">
+             class="line-clamp-3 text-[0.95rem] font-semibold leading-5 text-zinc-100 transition hover:text-emerald-300">
             ${escapeHtml(d.title)}
           </a>
           <div class="deal-signal-stack">
@@ -295,6 +314,10 @@ if (HAS_DOCUMENT) {
     currentPage = 1;
     renderDeals();
   });
+  els.postedWindow.addEventListener("change", () => {
+    currentPage = 1;
+    renderDeals();
+  });
 
   loadDeals();
   setInterval(() => loadDeals({ silent: true }), POLL_FOR_NEW_DATA_MS);
@@ -303,6 +326,7 @@ if (HAS_DOCUMENT) {
 if (typeof module !== "undefined") {
   module.exports = {
     formatPostTime,
+    filterDealsByPostedWindow,
     getPostTimeMs,
     sortDealsByNewest,
   };

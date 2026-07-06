@@ -1,6 +1,6 @@
 const assert = require("assert");
 
-const { formatPostTime, getPostTimeMs, sortDealsByNewest } = require("../public/app.js");
+const { filterDealsByPostedWindow, formatPostTime, getPostTimeMs, sortDealsByNewest } = require("../public/app.js");
 
 const newestSorted = sortDealsByNewest([
   { thread_id: "missing" },
@@ -21,5 +21,54 @@ assert.strictEqual(getPostTimeMs("2026-07-05T19:41:00Z"), Date.parse("2026-07-05
 
 assert.strictEqual(formatPostTime(null), "unknown");
 assert.notStrictEqual(formatPostTime("2026-07-05T19:41:00Z"), "unknown");
+
+const nowMs = Date.parse("2026-07-06T12:00:00Z");
+const dealsByAge = [
+  { thread_id: "fresh", posted_time: "2026-07-06T11:30:00Z" },
+  { thread_id: "four-hours", posted_time: "2026-07-06T08:00:00Z" },
+  { thread_id: "eight-hours", posted_time: "2026-07-06T04:00:00Z" },
+  { thread_id: "eleven-hours", posted_time: "2026-07-06T01:00:00Z" },
+  { thread_id: "one-day", posted_time: "2026-07-05T13:00:00Z" },
+  { thread_id: "two-days", posted_time: "2026-07-04T12:00:00Z" },
+  { thread_id: "eight-days", posted_time: "2026-06-28T12:00:00Z" },
+  { thread_id: "future", posted_time: "2026-07-06T13:00:00Z" },
+  { thread_id: "invalid", posted_time: "not-a-date" },
+  { thread_id: "missing" },
+];
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "3h", nowMs).map((deal) => deal.thread_id),
+  ["fresh"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "6h", nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "9h", nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours", "eight-hours"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "12h", nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours", "eight-hours", "eleven-hours"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "24h", nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours", "eight-hours", "eleven-hours", "one-day"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, "unknown-window", nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours", "eight-hours", "eleven-hours"],
+);
+
+assert.deepStrictEqual(
+  filterDealsByPostedWindow(dealsByAge, undefined, nowMs).map((deal) => deal.thread_id),
+  ["fresh", "four-hours", "eight-hours", "eleven-hours"],
+);
 
 console.log("app helper tests passed");
