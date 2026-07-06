@@ -41,7 +41,7 @@ class TestParseDeals(unittest.TestCase):
 
     def test_card_with_title_attribute_resolves_precise_date(self):
         """When the timestamp element carries a `title` attribute with an
-        absolute date, no fallback page fetch should ever be needed."""
+        absolute date, the card date is used directly."""
         deal = next(d for d in self.deals if d.thread_id == "1001")
         self.assertEqual(deal.posted_time, datetime(2026, 6, 22, 14, 0, 0))
         self.assertEqual(deal.posted_time_source, "card")
@@ -53,12 +53,10 @@ class TestParseDeals(unittest.TestCase):
         self.assertEqual(deal.posted_time_source, "card")
         self.assertTrue(deal.is_new)
 
-    def test_card_with_unparseable_timestamp_leaves_posted_time_none(self):
-        """These are exactly the deals that should fall through to the
-        per-page fetch fallback in fetch_frontpage_deals."""
+    def test_card_with_recently_posted_label_uses_scrape_time(self):
         deal = next(d for d in self.deals if d.thread_id == "1003")
-        self.assertIsNone(deal.posted_time)
-        self.assertIsNone(deal.posted_time_source)
+        self.assertEqual(deal.posted_time, datetime(2026, 6, 22, 16, 0, 0))
+        self.assertEqual(deal.posted_time_source, "card")
 
 
 if __name__ == "__main__":

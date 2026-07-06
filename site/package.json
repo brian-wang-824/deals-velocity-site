@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build": "tailwindcss -i ./src/input.css -o ./dist/style.css --minify && node ./scripts/copy-assets.js",
-    "dev": "tailwindcss -i ./src/input.css -o ./public/style.css --watch"
+    "dev": "tailwindcss -i ./src/input.css -o ./public/style.css --watch",
+    "test": "node ./tests/app-helpers.test.js"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"

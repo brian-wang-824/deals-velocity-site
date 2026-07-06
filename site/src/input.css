@@ -67,6 +67,14 @@
     @apply rounded bg-emerald-400 px-1.5 py-0.5 text-xs font-bold leading-none text-zinc-950;
   }
 
+  .deal-posted-time {
+    @apply mt-1 truncate text-xs leading-4 text-zinc-500;
+  }
+
+  .deal-posted-time time {
+    @apply text-zinc-300;
+  }
+
   .deal-metric {
     @apply min-w-0;
   }

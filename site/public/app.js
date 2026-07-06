@@ -1,21 +1,32 @@
 const REFRESH_INTERVAL_MINUTES = 10;
 const PAGE_SIZE = 25;
 const POLL_FOR_NEW_DATA_MS = 60_000; // check for a fresh deals.json every minute
+const LOCAL_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const POST_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  ...(LOCAL_TIME_ZONE ? { timeZone: LOCAL_TIME_ZONE } : {}),
+});
+const HAS_DOCUMENT = typeof document !== "undefined";
 
 let allDeals = [];
 let scrapedAtIso = null;
 let currentPage = 1;
 let countdownTimer = null;
 
-const els = {
-  search: document.getElementById("search"),
-  sort: document.getElementById("sort"),
-  dealsList: document.getElementById("deals-list"),
-  pagination: document.getElementById("pagination"),
-  resultsMeta: document.getElementById("results-meta"),
-  lastUpdated: document.getElementById("last-updated"),
-  nextRefresh: document.getElementById("next-refresh"),
-};
+const els = HAS_DOCUMENT
+  ? {
+      search: document.getElementById("search"),
+      sort: document.getElementById("sort"),
+      dealsList: document.getElementById("deals-list"),
+      pagination: document.getElementById("pagination"),
+      resultsMeta: document.getElementById("results-meta"),
+      lastUpdated: document.getElementById("last-updated"),
+      nextRefresh: document.getElementById("next-refresh"),
+    }
+  : {};
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -31,6 +42,30 @@ function formatRelativeTime(iso) {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   return `${hours}h ${mins % 60}m ago`;
+}
+
+function getPostTimeMs(iso) {
+  if (!iso) return Number.NEGATIVE_INFINITY;
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function formatPostTime(iso) {
+  const time = getPostTimeMs(iso);
+  if (time === Number.NEGATIVE_INFINITY) return "unknown";
+  return POST_TIME_FORMATTER.format(new Date(time));
+}
+
+function sortDealsByNewest(deals) {
+  return deals
+    .map((deal, index) => ({ deal, index }))
+    .sort((a, b) => {
+      const aTime = getPostTimeMs(a.deal.posted_time);
+      const bTime = getPostTimeMs(b.deal.posted_time);
+      if (aTime !== bTime) return bTime - aTime;
+      return a.index - b.index;
+    })
+    .map(({ deal }) => deal);
 }
 
 function velocityBadgeClass(label) {
@@ -85,6 +120,15 @@ function renderPriceLine(d, discount) {
     </div>`;
 }
 
+function renderPostedTime(d) {
+  const formatted = formatPostTime(d.posted_time);
+  if (formatted === "unknown") {
+    return `<p class="deal-posted-time">Posted unknown</p>`;
+  }
+
+  return `<p class="deal-posted-time">Posted <time datetime="${escapeHtml(d.posted_time)}">${escapeHtml(formatted)}</time></p>`;
+}
+
 function applyFiltersAndSort() {
   const q = els.search.value.trim().toLowerCase();
   const sort = els.sort.value;
@@ -95,11 +139,11 @@ function applyFiltersAndSort() {
       (d) => d.title.toLowerCase().includes(q) || (d.store || "").toLowerCase().includes(q)
     );
   }
-  const sorted = [...filtered];
+  let sorted = [...filtered];
   if (sort === "votes") sorted.sort((a, b) => b.votes - a.votes);
   else if (sort === "comments") sorted.sort((a, b) => b.comments - a.comments);
   else if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
-  else if (sort === "posted") sorted.sort((a, b) => (b.posted_time || "").localeCompare(a.posted_time || ""));
+  else if (sort === "posted") sorted = sortDealsByNewest(filtered);
   // "velocity" (default) keeps the server-computed order from deals.json
 
   return sorted;
@@ -147,6 +191,7 @@ function renderDealCard(d) {
           <div>
             ${renderPriceLine(d, discount)}
             <p class="truncate text-xs text-zinc-500">${escapeHtml(d.store || "Unknown store")}</p>
+            ${renderPostedTime(d)}
           </div>
           <div class="grid grid-cols-4 gap-2 border-t border-zinc-800 pt-3 text-xs">
             <span class="deal-metric metric-votes">${renderMetricIcon("votes")}<strong>${d.votes ?? 0}</strong><small>votes</small></span>
@@ -226,14 +271,24 @@ async function loadDeals({ silent = false } = {}) {
   }
 }
 
-els.search.addEventListener("input", () => {
-  currentPage = 1;
-  renderDeals();
-});
-els.sort.addEventListener("change", () => {
-  currentPage = 1;
-  renderDeals();
-});
+if (HAS_DOCUMENT) {
+  els.search.addEventListener("input", () => {
+    currentPage = 1;
+    renderDeals();
+  });
+  els.sort.addEventListener("change", () => {
+    currentPage = 1;
+    renderDeals();
+  });
 
-loadDeals();
-setInterval(() => loadDeals({ silent: true }), POLL_FOR_NEW_DATA_MS);
+  loadDeals();
+  setInterval(() => loadDeals({ silent: true }), POLL_FOR_NEW_DATA_MS);
+}
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    formatPostTime,
+    getPostTimeMs,
+    sortDealsByNewest,
+  };
+}

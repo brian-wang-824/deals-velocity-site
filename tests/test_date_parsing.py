@@ -42,6 +42,10 @@ class TestParseTimeToDatetime(unittest.TestCase):
         result = _parse_time_to_datetime("45m ago", self.scraped_at)
         self.assertEqual(result, datetime(2026, 6, 22, 11, 15, 0))
 
+    def test_recently_posted_uses_reference_time(self):
+        result = _parse_time_to_datetime("recently posted", self.scraped_at)
+        self.assertEqual(result, datetime(2026, 6, 22, 12, 0, 0))
+
     def test_unparseable_returns_none(self):
         self.assertIsNone(_parse_time_to_datetime("", self.scraped_at))
         self.assertIsNone(_parse_time_to_datetime("gibberish", self.scraped_at))
