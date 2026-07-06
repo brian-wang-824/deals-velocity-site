@@ -9,7 +9,6 @@ let countdownTimer = null;
 
 const els = {
   search: document.getElementById("search"),
-  velocityFilter: document.getElementById("velocity-filter"),
   sort: document.getElementById("sort"),
   dealsList: document.getElementById("deals-list"),
   pagination: document.getElementById("pagination"),
@@ -88,7 +87,6 @@ function renderPriceLine(d, discount) {
 
 function applyFiltersAndSort() {
   const q = els.search.value.trim().toLowerCase();
-  const velocity = els.velocityFilter.value;
   const sort = els.sort.value;
 
   let filtered = allDeals;
@@ -97,10 +95,6 @@ function applyFiltersAndSort() {
       (d) => d.title.toLowerCase().includes(q) || (d.store || "").toLowerCase().includes(q)
     );
   }
-  if (velocity !== "all") {
-    filtered = filtered.filter((d) => d.velocity_label === velocity);
-  }
-
   const sorted = [...filtered];
   if (sort === "votes") sorted.sort((a, b) => b.votes - a.votes);
   else if (sort === "comments") sorted.sort((a, b) => b.comments - a.comments);
@@ -233,10 +227,6 @@ async function loadDeals({ silent = false } = {}) {
 }
 
 els.search.addEventListener("input", () => {
-  currentPage = 1;
-  renderDeals();
-});
-els.velocityFilter.addEventListener("change", () => {
   currentPage = 1;
   renderDeals();
 });
