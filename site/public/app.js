@@ -155,10 +155,10 @@ function renderDealCard(d) {
             <p class="truncate text-xs text-zinc-500">${escapeHtml(d.store || "Unknown store")}</p>
           </div>
           <div class="grid grid-cols-4 gap-2 border-t border-zinc-800 pt-3 text-xs">
-            <span class="deal-metric">${renderMetricIcon("votes")}<strong>${d.votes ?? 0}</strong><small>votes</small></span>
-            <span class="deal-metric">${renderMetricIcon("comments")}<strong>${d.comments ?? 0}</strong><small>comments</small></span>
-            <span class="deal-metric">${renderMetricIcon("velocity")}<strong>${formatVelocity(d.recent_velocity)}</strong><small>velocity</small></span>
-            <span class="deal-metric">${renderMetricIcon("delta")}<strong>${formatDelta(d.vote_delta)}</strong><small>delta</small></span>
+            <span class="deal-metric metric-votes">${renderMetricIcon("votes")}<strong>${d.votes ?? 0}</strong><small>votes</small></span>
+            <span class="deal-metric metric-comments">${renderMetricIcon("comments")}<strong>${d.comments ?? 0}</strong><small>comments</small></span>
+            <span class="deal-metric metric-velocity">${renderMetricIcon("velocity")}<strong>${formatVelocity(d.recent_velocity)}</strong><small>velocity</small></span>
+            <span class="deal-metric metric-delta">${renderMetricIcon("delta")}<strong>${formatDelta(d.vote_delta)}</strong><small>delta</small></span>
           </div>
         </div>
       </div>

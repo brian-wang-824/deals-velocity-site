@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Slickdeals Velocity Tracker</title>
+  <title>I'll Have What You're Having In</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
   <header class="border-b border-zinc-800 bg-zinc-950/95">
-    <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-      <div class="flex items-end justify-between gap-4">
-        <div class="flex items-start gap-4">
+    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div class="flex min-w-0 items-start gap-3 sm:gap-4">
           <div class="site-logo" aria-hidden="true">
             <svg viewBox="0 0 48 48" role="img">
               <path d="M10 14a8 8 0 0 1 8-8h12a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V14Z" />
@@ -19,12 +19,12 @@
               <path d="m30.5 15 1.8 1.8 3.4-4" />
             </svg>
           </div>
-          <div>
-            <h1 class="text-3xl font-semibold uppercase text-white sm:text-4xl">I'll have what you're having</h1>
-            <p class="mt-2 max-w-2xl text-sm text-zinc-400">The crowd is already pointing at the good stuff. We just put it in one clean grid.</p>
+          <div class="min-w-0">
+            <h1 class="max-w-64 text-[1.85rem] font-semibold leading-[1.05] text-white sm:max-w-none sm:text-4xl">I'll have what you're having</h1>
+            <p class="mt-2 max-w-[18rem] text-sm leading-5 text-zinc-400 sm:max-w-2xl">The crowd is already pointing at the good stuff. We just check the pulse.</p>
           </div>
         </div>
-        <div class="shrink-0 text-right text-xs text-zinc-500 sm:text-sm">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[3.75rem] text-xs text-zinc-500 sm:block sm:shrink-0 sm:pl-0 sm:text-right sm:text-sm">
           <div id="last-updated"></div>
           <div id="next-refresh" class="font-medium text-zinc-300"></div>
         </div>
@@ -32,13 +32,13 @@
     </div>
   </header>
 
-  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-    <div class="mb-5 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+  <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <div class="mb-4 grid grid-cols-2 gap-2 sm:mb-5 sm:gap-3 lg:grid-cols-[1fr_auto_auto]">
       <input
         id="search"
         type="search"
         placeholder="Search deals or stores..."
-        class="control-field"
+        class="control-field col-span-2 lg:col-span-1"
       />
       <select id="velocity-filter" class="control-field">
         <option value="all">All velocities</option>

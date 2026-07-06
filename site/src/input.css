@@ -72,12 +72,13 @@
   }
 
   .deal-metric svg {
-    @apply mb-1 h-4 w-4 fill-zinc-500;
+    @apply mb-1 h-4 w-4;
   }
 
-  .deal-metric:hover svg {
-    @apply fill-emerald-300;
-  }
+  .metric-votes svg { @apply fill-emerald-300; }
+  .metric-comments svg { @apply fill-sky-300; }
+  .metric-velocity svg { @apply fill-amber-300; }
+  .metric-delta svg { @apply fill-violet-300; }
 
   .velocity-badge {
     @apply inline-flex max-w-24 items-center rounded px-2 py-1 text-[0.65rem] font-bold uppercase leading-none tracking-wide;
