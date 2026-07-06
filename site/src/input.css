@@ -32,7 +32,7 @@
   }
 
   .deal-title-row {
-    @apply grid h-16 grid-cols-[1fr_auto] items-start gap-2;
+    @apply grid h-16 grid-cols-[minmax(0,1fr)_auto] items-start gap-3;
   }
 
   .site-logo {
@@ -76,21 +76,39 @@
   }
 
   .deal-metric {
-    @apply min-w-0;
+    @apply flex min-h-7 min-w-0 items-center justify-end gap-1.5 overflow-hidden px-0 py-0;
   }
 
   .deal-metric svg {
-    @apply mb-1 h-4 w-4;
+    @apply h-4 w-4 shrink-0 sm:h-5 sm:w-5;
   }
 
-  .metric-votes svg { @apply fill-emerald-300; }
-  .metric-comments svg { @apply fill-sky-300; }
-  .metric-velocity svg { @apply fill-amber-300; }
-  .metric-delta svg { @apply fill-violet-300; }
+  .deal-metric strong {
+    @apply min-w-0 max-w-full truncate text-center text-sm leading-5 sm:text-base;
+  }
+
+  .metric-votes svg { @apply fill-yellow-300; }
+
+  .deal-signal-stack {
+    @apply flex w-28 shrink-0 flex-col items-end gap-1;
+  }
+
+  .deal-bottom-row {
+    @apply mt-auto grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3;
+  }
 
   .velocity-badge {
-    @apply inline-flex max-w-24 items-center rounded px-2 py-1 text-[0.65rem] font-bold uppercase leading-none tracking-wide;
+    @apply inline-flex max-w-full items-center rounded px-2 py-1 text-[0.65rem] font-bold uppercase leading-none tracking-wide;
   }
+
+  .momentum-chip {
+    @apply inline-flex max-w-full truncate rounded border px-1.5 py-0.5 text-[0.68rem] font-semibold leading-4;
+  }
+
+  .momentum-positive { @apply border-emerald-300/40 bg-emerald-300/10 text-emerald-200; }
+  .momentum-flat { @apply border-zinc-500/40 bg-zinc-800/60 text-zinc-300; }
+  .momentum-negative { @apply border-red-300/40 bg-red-300/10 text-red-200; }
+  .momentum-pending { @apply border-violet-300/40 bg-violet-300/10 text-violet-200; }
 
   .velocity-surging { @apply bg-red-400 text-zinc-950; }
   .velocity-hot { @apply bg-orange-300 text-zinc-950; }
