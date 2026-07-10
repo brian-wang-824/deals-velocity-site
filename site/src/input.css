@@ -313,6 +313,10 @@
     gap: 0.75rem;
   }
 
+  .ticket-rate-row {
+    justify-content: flex-end;
+  }
+
   .ticket-source {
     min-width: 0;
     overflow: hidden;
@@ -339,25 +343,14 @@
     height: 0.8rem;
   }
 
-  .ticket-rate-label,
   .ticket-rate {
     font-family: var(--font-ticket);
     font-size: 0.66rem;
   }
 
-  .ticket-rate-label {
-    color: var(--paper-muted);
-    letter-spacing: 0.08em;
-  }
-
   .ticket-rate {
     color: var(--ketchup-text);
     font-weight: 700;
-  }
-
-  .ticket-rate .rate {
-    color: var(--paper-muted);
-    font-weight: 400;
   }
 
   .badge-stamp {
@@ -450,6 +443,101 @@
 @media (min-width: 80rem) {
   .ticket-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/*
+ * Living-room displays need a different scale than desktop monitors. These
+ * breakpoints keep the interface inside a generous overscan-safe gutter while
+ * allowing the counter to use the width of 1080p and 4K televisions.
+ */
+@media (min-width: 100rem) {
+  html {
+    font-size: 112.5%;
+  }
+
+  .rail-bar,
+  .rail-status,
+  .ticket-counter {
+    width: min(calc(100% - 6rem), 105rem);
+  }
+
+  .rail-bar {
+    gap: 1.25rem 2rem;
+    padding-block: 1.35rem;
+  }
+
+  .rail-brand-copy h1 {
+    font-size: 1.65rem;
+  }
+
+  .rail-brand-copy p,
+  .rail-search,
+  .rail-select,
+  .pagination-button {
+    font-size: 0.78rem;
+  }
+
+  .rail-search,
+  .rail-select {
+    height: 3rem;
+  }
+
+  .rail-status {
+    min-height: 3rem;
+    font-size: 0.74rem;
+  }
+
+  .ticket-counter {
+    padding-block: 2rem 4rem;
+  }
+
+  .ticket-grid {
+    gap: 1.4rem;
+  }
+
+  .ticket-name {
+    font-size: 0.94rem;
+  }
+
+  .ticket-price {
+    font-size: 1.3rem;
+  }
+
+  .ticket-source,
+  .ticket-rate-label,
+  .ticket-rate {
+    font-size: 0.72rem;
+  }
+}
+
+@media (min-width: 160rem) {
+  html {
+    font-size: clamp(1.125rem, 0.625vw, 1.5rem);
+  }
+
+  .rail-bar,
+  .rail-status,
+  .ticket-counter {
+    width: min(calc(100% - 8rem), 150rem);
+  }
+
+  .ticket-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .ticket-photo {
+    height: 11rem;
+  }
+
+  .ticket-body {
+    min-height: 11rem;
+  }
+}
+
+@media (min-width: 216rem) {
+  .ticket-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 }
 

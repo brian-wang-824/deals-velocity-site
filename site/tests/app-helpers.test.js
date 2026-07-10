@@ -5,9 +5,8 @@ const {
   formatDelta,
   formatDiscount,
   formatPostTime,
-  formatVelocity,
   getPostTimeMs,
-  renderRateReadout,
+  renderTallyDelta,
   renderVelocityStamp,
   sortDealsByNewest,
 } = require("../public/app.js");
@@ -85,9 +84,6 @@ assert.strictEqual(formatDiscount(49.4), "-49%");
 assert.strictEqual(formatDiscount(null), "");
 assert.strictEqual(formatDelta(2), "+2");
 assert.strictEqual(formatDelta(-1), "-1");
-assert.strictEqual(formatVelocity(12.06), "12.1/hr");
-assert.strictEqual(formatVelocity(null), "pending");
-
 assert.strictEqual(
   renderVelocityStamp("surging"),
   '<span class="badge-stamp badge-surging">SURGING</span>',
@@ -99,9 +95,8 @@ assert.strictEqual(
 assert.strictEqual(renderVelocityStamp("warming"), "");
 assert.strictEqual(renderVelocityStamp("needs second scrape"), "");
 
-assert.ok(renderRateReadout({ vote_delta: 2, recent_velocity: 12.06 }).includes("+2"));
-assert.ok(renderRateReadout({ vote_delta: 2, recent_velocity: 12.06 }).includes("12.1/hr"));
-assert.ok(renderRateReadout({ vote_delta: null, recent_velocity: 6 }).includes("—"));
-assert.ok(renderRateReadout({ vote_delta: null, recent_velocity: null }).includes("pending"));
+assert.ok(renderTallyDelta({ vote_delta: 2 }).includes("+2 tallies since last count"));
+assert.ok(renderTallyDelta({ vote_delta: 2, recent_velocity: 12.06 }).includes("/hr") === false);
+assert.ok(renderTallyDelta({ vote_delta: null }).includes("pending next count"));
 
 console.log("app helper tests passed");

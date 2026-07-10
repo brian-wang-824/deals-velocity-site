@@ -91,11 +91,6 @@ function formatDiscount(value) {
   return `-${Math.round(Number(value))}%`;
 }
 
-function formatVelocity(value) {
-  if (value == null || Number.isNaN(Number(value))) return "pending";
-  return `${Number(value).toFixed(1)}/hr`;
-}
-
 function formatDelta(value) {
   if (value == null || Number.isNaN(Number(value))) return "pending";
   const amount = Number(value);
@@ -103,12 +98,11 @@ function formatDelta(value) {
   return `${amount}`;
 }
 
-function renderRateReadout(d) {
+function renderTallyDelta(d) {
   const hasDelta = d.vote_delta != null && !Number.isNaN(Number(d.vote_delta));
-  const hasVelocity = d.recent_velocity != null && !Number.isNaN(Number(d.recent_velocity));
-  const label = hasDelta || hasVelocity
-    ? `${hasDelta ? formatDelta(d.vote_delta) : "—"} <span class="rate">· ${hasVelocity ? formatVelocity(d.recent_velocity) : "pending"}</span>`
-    : "pending";
+  const label = hasDelta
+    ? `${formatDelta(d.vote_delta)} tallies since last count`
+    : "pending next count";
 
   return `<span class="ticket-rate">${label}</span>`;
 }
@@ -221,8 +215,7 @@ function renderDealCard(d) {
             ${renderVoteMetric(d)}
           </div>
           <div class="ticket-rate-row">
-            <span class="ticket-rate-label">PACE</span>
-            ${renderRateReadout(d)}
+            ${renderTallyDelta(d)}
           </div>
         </div>
       </div>
@@ -319,10 +312,9 @@ if (typeof module !== "undefined") {
     formatDelta,
     formatDiscount,
     formatPostTime,
-    formatVelocity,
     filterDealsByPostedWindow,
     getPostTimeMs,
-    renderRateReadout,
+    renderTallyDelta,
     renderVelocityStamp,
     sortDealsByNewest,
   };
