@@ -12,3 +12,7 @@ venv/
 site/node_modules/
 site/dist/
 site/public/style.css
+.pnpm-store/
+
+# Local review artifacts
+product-audit/

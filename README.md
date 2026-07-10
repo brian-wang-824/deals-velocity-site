@@ -1,107 +1,68 @@
 # Deals Velocity
 
-A small static dashboard that tracks the Slickdeals frontpage and ranks deals by recent vote velocity. The scraper writes JSON snapshots into `site/public/data/`, and the frontend renders the latest snapshot as a searchable, sortable deal grid.
+A static Slickdeals dashboard that ranks current frontpage deals by thumbs-up velocity. A scheduled Python scraper maintains a rolling snapshot history; a dependency-light browser app provides search, posted-time filters, sorting, and pagination.
 
-## What It Does
+## How it works
 
-- Scrapes Slickdeals frontpage cards on a scheduled GitHub Actions workflow.
-- Keeps a rolling history of recent snapshots in `history.json`.
-- Computes vote delta, recent velocity, lifetime velocity, discount percentage, and velocity labels.
-- Publishes a static site that reads `data/deals.json`.
-- Lets users filter by posted-time window, search title/store text, and sort by velocity, votes, or newest post time.
+1. `scripts/run_scrape.py` fetches and parses the Slickdeals frontpage.
+2. `site/public/data/history.json` retains the latest 48 snapshots (about eight hours at the scheduled cadence).
+3. `scraper/velocity.py` calculates vote deltas, recent and lifetime velocity, discounts, and velocity labels.
+4. `site/public/data/deals.json` stores the enriched current snapshot consumed by the frontend.
+5. Render builds and serves the static files from `site/dist/`.
 
-## Repository Layout
+## Project structure
 
 ```text
-.
-|-- scraper/                  # Slickdeals parser and velocity enrichment
-|-- scripts/run_scrape.py      # Scheduled scrape entry point
-|-- site/
-|   |-- public/app.js          # Browser app and testable helper functions
-|   |-- public/data/           # Committed JSON snapshots served by the site
-|   |-- scripts/copy-assets.js # Static build asset copy step
-|   |-- src/index.html         # App shell
-|   `-- src/input.css          # Tailwind source CSS
-|-- tests/                     # Python unittest suite
-|-- requirements-scraper.txt   # Runtime scraper dependencies
-|-- requirements-dev.txt       # Development dependency notes
-`-- render.yaml                # Render static-site configuration
+scraper/                 Parsing and velocity calculations
+scripts/run_scrape.py    One-shot scraper entry point
+site/public/app.js       Browser application and exported test helpers
+site/public/data/        Committed scraper output
+site/src/                HTML shell and Tailwind source CSS
+site/scripts/            Static build asset copying
+site/tests/              Frontend helper tests
+tests/                   Python unit and scraper workflow tests
 ```
 
-## Data Files
+## Setup
 
-`site/public/data/history.json` stores the rolling snapshot window used to calculate velocity. `site/public/data/deals.json` stores the latest enriched snapshot consumed by the frontend.
-
-The scheduled scraper commits both files so the static deployment can rebuild from repository state.
-
-## Local Development
-
-Install Python dependencies:
+Requirements: Python 3.12+ and Node.js with npm.
 
 ```powershell
-python -m pip install -r requirements-dev.txt
-```
-
-Install site dependencies:
-
-```powershell
+python -m pip install -r requirements-scraper.txt
 cd site
-npm install
+npm ci
 ```
 
-Build CSS for local static serving:
+## Development
+
+Watch and rebuild CSS in `site/public/style.css`:
 
 ```powershell
 cd site
 npm run dev
 ```
 
-The `dev` script watches `site/src/input.css` and writes `site/public/style.css`, which is intentionally ignored because it is generated.
+Serve `site/public/` with any local static server. The generated CSS, dependencies, and `site/dist/` are intentionally ignored.
 
-## Build
-
-```powershell
-cd site
-npm run build
-```
-
-The build writes `site/dist/`, copies `index.html`, `app.js`, and `data/deals.json`, and emits minified Tailwind CSS. `site/dist/` is generated output and should not be committed.
-
-## Run The Scraper
+Run one scrape from the repository root:
 
 ```powershell
 python scripts/run_scrape.py
 ```
 
-This performs one frontpage scrape, appends a new history snapshot, trims the rolling history, computes velocity metrics, and rewrites the JSON data files atomically.
+The scraper leaves existing data untouched if no deals are returned and writes successful updates atomically.
 
-## Tests
-
-Run the Python tests:
+## Test and build
 
 ```powershell
-python -m unittest discover
-```
-
-Run the site helper tests:
-
-```powershell
+python -m unittest discover -v
 cd site
 npm test
+npm run build
 ```
 
-## Deployment
+The production build writes minified CSS and required static assets to `site/dist/`. It removes stale build assets and fails if a required source asset is missing.
 
-The included `render.yaml` configures a Render static site:
+## Automation and deployment
 
-- Build command: `cd site && npm install && npm run build`
-- Publish directory: `site/dist`
-- JSON data headers: `Cache-Control: no-cache`
-
-The `.github/workflows/scrape.yml` workflow runs every ten minutes and can also be triggered manually with `workflow_dispatch`.
-
-## Notes For Maintenance
-
-- Keep scraper tests focused on parser behavior and data-shape stability.
-- Keep generated files out of source control: `site/dist/`, `site/node_modules/`, `site/public/style.css`, Python caches, and local attachment scratch files are ignored.
-- The frontend intentionally reads only `deals.json`; `history.json` is for scraper-side velocity calculations.
+`.github/workflows/scrape.yml` runs every ten minutes and commits updated `history.json` and `deals.json` files. `render.yaml` configures the Render static site to run `npm install && npm run build`, publish `site/dist`, and disable caching for JSON data.
