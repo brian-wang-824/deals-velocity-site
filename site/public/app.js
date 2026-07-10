@@ -86,19 +86,6 @@ function filterDealsByPostedWindow(deals, windowKey = "12h", nowMs = Date.now())
   });
 }
 
-function velocityBadgeClass(label) {
-  const map = {
-    surging: "velocity-surging",
-    hot: "velocity-hot",
-    warming: "velocity-warming",
-    slow: "velocity-slow",
-    flat: "velocity-flat",
-    cooling: "velocity-cooling",
-    "needs second scrape": "velocity-pending",
-  };
-  return map[label] || "velocity-flat";
-}
-
 function formatDiscount(value) {
   if (value == null || Number.isNaN(Number(value)) || Number(value) <= 0) return "";
   return `-${Math.round(Number(value))}%`;
@@ -116,29 +103,24 @@ function formatDelta(value) {
   return `${amount}`;
 }
 
-function renderMetricIcon(type) {
-  const icons = {
-    votes: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.3 7.2 7.8 2h1.4l-.5 4.2h4.1l-1.4 7.2H4.2V7.2h1.1Z"/><path d="M2.2 7.2h2v6.2h-2z"/></svg>`,
-  };
-  return icons[type] || "";
-}
-
-function momentumChipClass(d) {
-  if (d.vote_delta == null || Number.isNaN(Number(d.vote_delta))) return "momentum-pending";
-  const delta = Number(d.vote_delta);
-  if (delta > 0) return "momentum-positive";
-  if (delta < 0) return "momentum-negative";
-  return "momentum-flat";
-}
-
-function renderMomentumChip(d) {
+function renderRateReadout(d) {
   const hasDelta = d.vote_delta != null && !Number.isNaN(Number(d.vote_delta));
   const hasVelocity = d.recent_velocity != null && !Number.isNaN(Number(d.recent_velocity));
   const label = hasDelta || hasVelocity
-    ? `${formatDelta(d.vote_delta)} | ${formatVelocity(d.recent_velocity)}`
+    ? `${hasDelta ? formatDelta(d.vote_delta) : "—"} <span class="rate">· ${hasVelocity ? formatVelocity(d.recent_velocity) : "pending"}</span>`
     : "pending";
 
-  return `<span class="momentum-chip ${momentumChipClass(d)}">${escapeHtml(label)}</span>`;
+  return `<span class="ticket-rate">${label}</span>`;
+}
+
+function renderVelocityStamp(label) {
+  if (label === "surging") {
+    return `<span class="badge-stamp badge-surging">SURGING</span>`;
+  }
+  if (label === "hot") {
+    return `<span class="badge-stamp badge-hot">HOT</span>`;
+  }
+  return "";
 }
 
 function renderPriceLine(d, discount) {
@@ -146,24 +128,36 @@ function renderPriceLine(d, discount) {
   const referencePrice = d.original_price ? escapeHtml(d.original_price) : "";
 
   return `
-    <div class="deal-price-row">
-      <span class="deal-price">${currentPrice}</span>
-      ${referencePrice ? `<span class="deal-reference-price">${referencePrice}</span>` : ""}
-      ${discount ? `<span class="deal-discount">${discount}</span>` : ""}
+    <div class="ticket-price-row">
+      <span class="ticket-price">${currentPrice}</span>
+      ${referencePrice ? `<span class="ticket-reference-price">${referencePrice}</span>` : ""}
+      ${discount ? `<span class="ticket-discount">${discount}</span>` : ""}
     </div>`;
 }
 
 function renderPostedTime(d) {
   const formatted = formatPostTime(d.posted_time);
   if (formatted === "unknown") {
-    return `<p class="deal-posted-time">Posted unknown</p>`;
+    return "posted unknown";
   }
 
-  return `<p class="deal-posted-time">Posted <time datetime="${escapeHtml(d.posted_time)}">${escapeHtml(formatted)}</time></p>`;
+  return `<time datetime="${escapeHtml(d.posted_time)}">${escapeHtml(formatted)}</time>`;
 }
 
 function renderVoteMetric(d) {
-  return `<span class="deal-metric metric-votes">${renderMetricIcon("votes")}<strong>${d.votes ?? 0}</strong></span>`;
+  const votes = Number.isFinite(Number(d.votes)) ? Number(d.votes) : 0;
+  return `<span class="tally" aria-label="${votes} votes">
+    <svg viewBox="0 0 20 14" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="1.6">
+        <line x1="2" y1="2" x2="2" y2="12" />
+        <line x1="6" y1="2" x2="6" y2="12" />
+        <line x1="10" y1="2" x2="10" y2="12" />
+        <line x1="14" y1="2" x2="14" y2="12" />
+        <line x1="1" y1="12" x2="15" y2="1" />
+      </g>
+    </svg>
+    ${votes}
+  </span>`;
 }
 
 function applyFiltersAndSort() {
@@ -194,11 +188,11 @@ function renderDeals() {
   const end = Math.min(start + pageItems.length, filtered.length);
 
   els.resultsMeta.textContent = filtered.length
-    ? `Showing ${start + 1}-${end} of ${filtered.length} deals`
-    : "No matching deals";
+    ? `Showing ${start + 1}-${end} of ${filtered.length} tickets`
+    : "No tickets match that search yet";
 
   if (pageItems.length === 0) {
-    els.dealsList.innerHTML = `<p class="col-span-full py-16 text-center text-sm text-zinc-500">No deals match your filters.</p>`;
+    els.dealsList.innerHTML = `<p class="ticket-state">No tickets match that search yet.</p>`;
   } else {
     els.dealsList.innerHTML = pageItems.map(renderDealCard).join("");
   }
@@ -210,29 +204,26 @@ function renderDealCard(d) {
   const discount = formatDiscount(d.discount_percentage);
 
   return `
-    <article class="deal-card group">
-      <div class="relative aspect-square overflow-hidden border-b border-zinc-800 bg-zinc-900">
-        <img src="${escapeHtml(d.image_url || "")}" alt="" loading="lazy"
-             class="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+    <article class="ticket">
+      ${renderVelocityStamp(d.velocity_label)}
+      <div class="ticket-tear" aria-hidden="true"></div>
+      <div class="ticket-photo">
+        <img src="${escapeHtml(d.image_url || "")}" alt="" loading="lazy" />
       </div>
-      <div class="flex min-h-40 flex-col gap-3 p-3">
-        <div class="deal-title-row">
-          <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener"
-             class="line-clamp-3 text-[0.95rem] font-semibold leading-5 text-zinc-100 transition hover:text-emerald-300">
-            ${escapeHtml(d.title)}
-          </a>
-          <div class="deal-signal-stack">
-            <span class="velocity-badge ${velocityBadgeClass(d.velocity_label)}">${escapeHtml(d.velocity_label)}</span>
-            ${renderMomentumChip(d)}
+      <div class="ticket-body">
+        <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener" class="ticket-name">
+          ${escapeHtml(d.title)}
+        </a>
+        ${renderPriceLine(d, discount)}
+        <div class="ticket-foot">
+          <div class="ticket-meta-row">
+            <span class="ticket-source">${escapeHtml(d.store || "Unknown store")} · ${renderPostedTime(d)}</span>
+            ${renderVoteMetric(d)}
           </div>
-        </div>
-        <div class="deal-bottom-row">
-          <div class="min-w-0">
-            ${renderPriceLine(d, discount)}
-            <p class="truncate text-xs text-zinc-500">${escapeHtml(d.store || "Unknown store")}</p>
-            ${renderPostedTime(d)}
+          <div class="ticket-rate-row">
+            <span class="ticket-rate-label">PACE</span>
+            ${renderRateReadout(d)}
           </div>
-          ${renderVoteMetric(d)}
         </div>
       </div>
     </article>`;
@@ -246,11 +237,9 @@ function renderPagination(totalPages) {
   const buttons = [];
   for (let p = 1; p <= totalPages; p++) {
     buttons.push(
-      `<button data-page="${p}" class="rounded-md px-3 py-1 text-sm transition ${
-        p === currentPage
-          ? "bg-emerald-300 text-zinc-950"
-          : "border border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
-      }">${p}</button>`
+      `<button data-page="${p}" class="pagination-button" ${
+        p === currentPage ? 'aria-current="page"' : ""
+      } aria-label="Page ${p}">${p}</button>`
     );
   }
   els.pagination.innerHTML = buttons.join("");
@@ -258,7 +247,8 @@ function renderPagination(totalPages) {
     btn.addEventListener("click", () => {
       currentPage = Number(btn.dataset.page);
       renderDeals();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
     });
   });
 }
@@ -270,14 +260,14 @@ function renderCountdown() {
   clearInterval(countdownTimer);
   function tick() {
     const msLeft = nextRefresh - Date.now();
-    els.lastUpdated.textContent = `Updated ${formatRelativeTime(scrapedAtIso)}`;
+    els.lastUpdated.textContent = `● Counter updated ${formatRelativeTime(scrapedAtIso)}`;
     if (msLeft <= 0) {
-      els.nextRefresh.textContent = "Refreshing shortly...";
+      els.nextRefresh.textContent = "Counting again shortly…";
       return;
     }
     const mins = Math.floor(msLeft / 60_000);
     const secs = Math.floor((msLeft % 60_000) / 1000);
-    els.nextRefresh.textContent = `Next refresh in ${mins}m ${secs}s`;
+    els.nextRefresh.textContent = `Next count in ${mins}m ${secs}s`;
   }
   tick();
   countdownTimer = setInterval(tick, 1000);
@@ -299,7 +289,8 @@ async function loadDeals({ silent = false } = {}) {
     renderCountdown();
   } catch (err) {
     if (!silent) {
-      els.dealsList.innerHTML = `<p class="col-span-full py-16 text-center text-sm text-red-300">Couldn't load deals data. Try refreshing the page.</p>`;
+      els.resultsMeta.textContent = "Counter unavailable";
+      els.dealsList.innerHTML = `<p class="ticket-state ticket-state-error">Couldn't pull the latest tickets. Try again in a moment.</p>`;
     }
     console.error("Failed to load deals.json", err);
   }
@@ -325,9 +316,14 @@ if (HAS_DOCUMENT) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    formatDelta,
+    formatDiscount,
     formatPostTime,
+    formatVelocity,
     filterDealsByPostedWindow,
     getPostTimeMs,
+    renderRateReadout,
+    renderVelocityStamp,
     sortDealsByNewest,
   };
 }

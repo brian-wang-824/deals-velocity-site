@@ -3,108 +3,489 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --ink: #1b1b1e;
+    --ink-soft: #232327;
+    --paper: #f3ead9;
+    --paper-dim: #e4d8c0;
+    --ketchup: #e8432f;
+    --ketchup-text: #a72518;
+    --mustard: #f2a73b;
+    --mustard-text: #765000;
+    --mint: #3fb88b;
+    --chrome: #9aa0a6;
+    --line: rgba(243, 234, 217, 0.14);
+    --paper-line: rgba(27, 27, 30, 0.25);
+    --paper-muted: rgba(27, 27, 30, 0.62);
+    --paper-faint: rgba(27, 27, 30, 0.62);
+    --shadow-ticket: rgba(0, 0, 0, 0.35);
+    --focus: #77d9b4;
+    --font-display: "Anton", sans-serif;
+    --font-ticket: "Space Mono", monospace;
+    --font-body: "Work Sans", sans-serif;
+    --radius-card: 2px;
+    --radius-chip: 3px;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --duration-standard: 160ms;
+  }
+
   html {
     color-scheme: dark;
   }
 
   body {
-    background: linear-gradient(180deg, #09090b 0%, #18181b 100%);
+    min-height: 100vh;
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
   }
 }
 
 @layer components {
-  .control-field {
-    @apply h-11 rounded-md border border-zinc-800 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/20;
+  .rail-shell {
+    border-bottom: 1px solid var(--line);
+    background: var(--ink-soft);
   }
 
-  .deal-card {
-    @apply overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/80 shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-zinc-600 hover:bg-zinc-900;
+  .rail-bar,
+  .rail-status,
+  .ticket-counter {
+    width: min(100% - 2rem, 80rem);
+    margin-inline: auto;
   }
 
-  .deal-title-row {
-    @apply grid h-20 grid-cols-[minmax(0,1fr)_auto] items-start gap-3;
+  .rail-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    padding-block: 1.1rem;
+  }
+
+  .rail-brand {
+    display: flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.8rem;
   }
 
   .site-logo {
-    @apply mt-1 grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-emerald-300 text-zinc-950 shadow-lg shadow-emerald-950/30;
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: none;
+    place-items: center;
+    border-radius: var(--radius-chip);
+    background: var(--mint);
+    color: var(--ink);
   }
 
   .site-logo svg {
-    @apply h-8 w-8 fill-zinc-950/15 stroke-zinc-950 stroke-[2.2];
+    width: 1.8rem;
+    height: 1.8rem;
+    fill: rgba(27, 27, 30, 0.15);
+    stroke: currentColor;
+    stroke-width: 2.2;
   }
 
   .site-logo circle {
-    @apply fill-zinc-950 stroke-0;
+    fill: currentColor;
+    stroke: none;
   }
 
   .site-logo path:last-child {
-    @apply fill-none stroke-emerald-300 stroke-[1.7];
+    fill: none;
+    stroke: var(--mint);
+    stroke-width: 1.7;
   }
 
-  .deal-price-row {
-    @apply flex min-h-8 flex-wrap items-baseline gap-x-2 gap-y-1;
+  .rail-brand-copy h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 2vw, 1.5rem);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.015em;
   }
 
-  .deal-price {
-    @apply text-2xl font-bold leading-8 text-white;
+  .rail-brand-copy p {
+    margin: 0.28rem 0 0;
+    color: var(--chrome);
+    font-size: 0.72rem;
+    line-height: 1.35;
   }
 
-  .deal-reference-price {
-    @apply text-sm font-medium leading-5 text-zinc-500 line-through decoration-zinc-600;
+  .rail-controls {
+    display: grid;
+    min-width: min(100%, 32rem);
+    flex: 1;
+    grid-template-columns: minmax(12rem, 1fr) auto auto;
+    gap: 0.65rem;
   }
 
-  .deal-discount {
-    @apply rounded bg-emerald-400 px-1.5 py-0.5 text-xs font-bold leading-none text-zinc-950;
+  .rail-search,
+  .rail-select {
+    min-width: 0;
+    height: 2.6rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-chip);
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-ticket);
+    font-size: 0.72rem;
   }
 
-  .deal-posted-time {
-    @apply mt-1 truncate text-xs leading-4 text-zinc-500;
+  .rail-search {
+    padding-inline: 0.85rem;
   }
 
-  .deal-posted-time time {
-    @apply text-zinc-300;
+  .rail-search::placeholder {
+    color: var(--chrome);
   }
 
-  .deal-metric {
-    @apply flex min-h-8 min-w-0 items-center justify-end gap-2 overflow-hidden px-0 py-0;
+  .rail-select {
+    padding-inline: 0.7rem 2rem;
+    text-transform: uppercase;
   }
 
-  .deal-metric svg {
-    @apply h-5 w-5 shrink-0 sm:h-6 sm:w-6;
+  .rail-search:hover,
+  .rail-select:hover {
+    border-color: var(--chrome);
   }
 
-  .deal-metric strong {
-    @apply min-w-0 max-w-full truncate text-center text-base font-bold leading-6 sm:text-lg;
+  .rail-status {
+    display: flex;
+    min-height: 2.65rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    border-top: 1px solid var(--line);
+    color: var(--chrome);
+    font-family: var(--font-ticket);
+    font-size: 0.68rem;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
   }
 
-  .metric-votes svg { @apply fill-yellow-300; }
-
-  .deal-signal-stack {
-    @apply flex w-28 shrink-0 flex-col items-end gap-1;
+  .rail-update {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem 0.8rem;
+    text-align: right;
   }
 
-  .deal-bottom-row {
-    @apply mt-auto grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3;
+  #last-updated {
+    color: var(--mint);
   }
 
-  .velocity-badge {
-    @apply inline-flex max-w-full items-center rounded px-2 py-1 text-[0.65rem] font-bold uppercase leading-none tracking-wide;
+  .ticket-counter {
+    padding-block: 1.5rem 3rem;
   }
 
-  .momentum-chip {
-    @apply inline-flex max-w-full truncate rounded border px-1.5 py-0.5 text-[0.68rem] font-semibold leading-4;
+  .ticket-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 1.15rem;
   }
 
-  .momentum-positive { @apply border-emerald-300/40 bg-emerald-300/10 text-emerald-200; }
-  .momentum-flat { @apply border-zinc-500/40 bg-zinc-800/60 text-zinc-300; }
-  .momentum-negative { @apply border-red-300/40 bg-red-300/10 text-red-200; }
-  .momentum-pending { @apply border-violet-300/40 bg-violet-300/10 text-violet-200; }
+  .ticket {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    border-radius: var(--radius-card);
+    background: var(--paper);
+    color: var(--ink);
+    filter: drop-shadow(0 6px 14px var(--shadow-ticket));
+    transition: transform var(--duration-standard) var(--ease-standard);
+  }
 
-  .velocity-surging { @apply bg-red-400 text-zinc-950; }
-  .velocity-hot { @apply bg-orange-300 text-zinc-950; }
-  .velocity-warming { @apply bg-amber-300 text-zinc-950; }
-  .velocity-slow { @apply bg-yellow-200 text-zinc-950; }
-  .velocity-flat { @apply bg-zinc-700 text-zinc-200; }
-  .velocity-cooling { @apply bg-sky-300 text-zinc-950; }
-  .velocity-pending { @apply bg-violet-300 text-zinc-950; }
+  .ticket:hover {
+    transform: translateY(-2px);
+  }
+
+  .ticket-tear {
+    width: 100%;
+    height: 11px;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background:
+      linear-gradient(-45deg, transparent 6px, var(--paper) 6px) 0 0 / 12px 12px repeat-x,
+      linear-gradient(45deg, transparent 6px, var(--paper) 6px) 0 0 / 12px 12px repeat-x;
+    background-color: var(--ink);
+  }
+
+  .ticket-photo {
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-bottom: 1px dashed var(--paper-line);
+    background: var(--paper-dim);
+  }
+
+  .ticket-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .ticket-body {
+    display: flex;
+    min-height: 10.5rem;
+    flex: 1;
+    flex-direction: column;
+    padding: 0.85rem 0.9rem 1rem;
+  }
+
+  .ticket-name {
+    display: -webkit-box;
+    min-height: 2.55rem;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .ticket-name:hover {
+    color: var(--ketchup-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .ticket-price-row {
+    display: flex;
+    min-height: 2rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.5rem;
+    margin-top: 0.6rem;
+    font-family: var(--font-ticket);
+  }
+
+  .ticket-price {
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  .ticket-reference-price {
+    color: var(--paper-faint);
+    font-size: 0.75rem;
+    text-decoration: line-through;
+  }
+
+  .ticket-discount {
+    border-radius: var(--radius-card);
+    background: var(--mint);
+    padding: 0.15rem 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+
+  .ticket-foot {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: auto;
+    border-top: 1px dashed var(--paper-line);
+    padding-top: 0.6rem;
+  }
+
+  .ticket-meta-row,
+  .ticket-rate-row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .ticket-source {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--paper-muted);
+    font-family: var(--font-ticket);
+    font-size: 0.65rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tally {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--ketchup-text);
+    font-family: var(--font-ticket);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .tally svg {
+    width: 1.05rem;
+    height: 0.8rem;
+  }
+
+  .ticket-rate-label,
+  .ticket-rate {
+    font-family: var(--font-ticket);
+    font-size: 0.66rem;
+  }
+
+  .ticket-rate-label {
+    color: var(--paper-muted);
+    letter-spacing: 0.08em;
+  }
+
+  .ticket-rate {
+    color: var(--ketchup-text);
+    font-weight: 700;
+  }
+
+  .ticket-rate .rate {
+    color: var(--paper-muted);
+    font-weight: 400;
+  }
+
+  .badge-stamp {
+    position: absolute;
+    z-index: 1;
+    top: -0.45rem;
+    right: 0.65rem;
+    transform: rotate(4deg);
+    border: 1.5px solid;
+    border-radius: var(--radius-card);
+    background: var(--paper);
+    padding: 0.3rem 0.55rem;
+    font-family: var(--font-ticket);
+    font-size: 0.63rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+  }
+
+  .badge-surging {
+    border-color: var(--ketchup);
+    color: var(--ketchup-text);
+  }
+
+  .badge-hot {
+    border-color: var(--mustard);
+    color: var(--mustard-text);
+  }
+
+  .ticket-state {
+    grid-column: 1 / -1;
+    padding-block: 5rem;
+    color: var(--chrome);
+    text-align: center;
+  }
+
+  .ticket-state-error {
+    color: var(--paper);
+  }
+
+  .pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    margin-top: 2rem;
+  }
+
+  .pagination-button {
+    min-width: 2.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-chip);
+    background: var(--ink-soft);
+    padding: 0.45rem 0.65rem;
+    color: var(--paper);
+    font-family: var(--font-ticket);
+    font-size: 0.72rem;
+  }
+
+  .pagination-button:hover {
+    border-color: var(--chrome);
+  }
+
+  .pagination-button[aria-current="page"] {
+    border-color: var(--mint);
+    background: var(--mint);
+    color: var(--ink);
+    font-weight: 700;
+  }
+}
+
+@media (min-width: 40rem) {
+  .rail-bar,
+  .rail-status,
+  .ticket-counter {
+    width: min(100% - 3rem, 80rem);
+  }
+
+  .ticket-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .ticket-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 80rem) {
+  .ticket-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .rail-controls {
+    flex-basis: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rail-search {
+    grid-column: 1 / -1;
+  }
+
+  .rail-status {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-block: 0.7rem;
+  }
+
+  .rail-update {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .ticket:hover {
+    transform: none;
+  }
 }

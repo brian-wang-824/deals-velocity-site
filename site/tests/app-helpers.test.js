@@ -1,6 +1,16 @@
 const assert = require("assert");
 
-const { filterDealsByPostedWindow, formatPostTime, getPostTimeMs, sortDealsByNewest } = require("../public/app.js");
+const {
+  filterDealsByPostedWindow,
+  formatDelta,
+  formatDiscount,
+  formatPostTime,
+  formatVelocity,
+  getPostTimeMs,
+  renderRateReadout,
+  renderVelocityStamp,
+  sortDealsByNewest,
+} = require("../public/app.js");
 
 const newestSorted = sortDealsByNewest([
   { thread_id: "missing" },
@@ -70,5 +80,28 @@ assert.deepStrictEqual(
   filterDealsByPostedWindow(dealsByAge, undefined, nowMs).map((deal) => deal.thread_id),
   ["fresh", "four-hours", "eight-hours", "eleven-hours"],
 );
+
+assert.strictEqual(formatDiscount(49.4), "-49%");
+assert.strictEqual(formatDiscount(null), "");
+assert.strictEqual(formatDelta(2), "+2");
+assert.strictEqual(formatDelta(-1), "-1");
+assert.strictEqual(formatVelocity(12.06), "12.1/hr");
+assert.strictEqual(formatVelocity(null), "pending");
+
+assert.strictEqual(
+  renderVelocityStamp("surging"),
+  '<span class="badge-stamp badge-surging">SURGING</span>',
+);
+assert.strictEqual(
+  renderVelocityStamp("hot"),
+  '<span class="badge-stamp badge-hot">HOT</span>',
+);
+assert.strictEqual(renderVelocityStamp("warming"), "");
+assert.strictEqual(renderVelocityStamp("needs second scrape"), "");
+
+assert.ok(renderRateReadout({ vote_delta: 2, recent_velocity: 12.06 }).includes("+2"));
+assert.ok(renderRateReadout({ vote_delta: 2, recent_velocity: 12.06 }).includes("12.1/hr"));
+assert.ok(renderRateReadout({ vote_delta: null, recent_velocity: 6 }).includes("—"));
+assert.ok(renderRateReadout({ vote_delta: null, recent_velocity: null }).includes("pending"));
 
 console.log("app helper tests passed");

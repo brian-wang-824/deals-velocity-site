@@ -3,60 +3,73 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IHWYH</title>
+  <meta name="description" content="The crowd already ordered. We're just counting tickets." />
+  <title>I'll Have What You're Having</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Work+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-  <header class="border-b border-zinc-800 bg-zinc-950/95">
-    <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-        <div class="flex min-w-0 items-start gap-3 sm:gap-4">
-          <div class="site-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
-              <path d="M10 14a8 8 0 0 1 8-8h12a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V14Z" />
-              <path d="M16 17h16M16 24h10M16 31h16" />
-              <circle cx="33" cy="15" r="5" />
-              <path d="m30.5 15 1.8 1.8 3.4-4" />
-            </svg>
-          </div>
-          <div class="min-w-0">
-            <h1 class="max-w-64 text-[1.85rem] font-semibold leading-[1.05] text-white sm:max-w-none sm:text-4xl">I'LL HAVE WHAT YOU'RE HAVING</h1>
-            <p class="mt-2 max-w-[18rem] text-sm leading-5 text-zinc-400 sm:max-w-2xl">The crowd is already pointing at the good stuff. We just check the pulse.</p>
-          </div>
+<body>
+  <header class="rail-shell">
+    <div class="rail-bar">
+      <div class="rail-brand">
+        <div class="site-logo" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <path d="M10 14a8 8 0 0 1 8-8h12a8 8 0 0 1 8 8v20a8 8 0 0 1-8 8H18a8 8 0 0 1-8-8V14Z" />
+            <path d="M16 17h16M16 24h10M16 31h16" />
+            <circle cx="33" cy="15" r="5" />
+            <path d="m30.5 15 1.8 1.8 3.4-4" />
+          </svg>
         </div>
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 pl-[3.75rem] text-xs text-zinc-500 sm:block sm:shrink-0 sm:pl-0 sm:text-right sm:text-sm">
-          <div id="last-updated"></div>
-          <div id="next-refresh" class="font-medium text-zinc-300"></div>
+        <div class="rail-brand-copy">
+          <h1>I'LL HAVE WHAT YOU'RE HAVING</h1>
+          <p>The crowd already ordered. We're just counting tickets.</p>
         </div>
+      </div>
+
+      <div class="rail-controls" aria-label="Deal controls">
+        <label class="sr-only" for="search">Search deals or stores</label>
+        <input
+          id="search"
+          type="search"
+          placeholder="search deals or stores…"
+          class="rail-search"
+        />
+
+        <label class="sr-only" for="posted-window">Posted time window</label>
+        <select id="posted-window" class="rail-select">
+          <option value="3h">Posted: 3 hours</option>
+          <option value="6h">Posted: 6 hours</option>
+          <option value="9h">Posted: 9 hours</option>
+          <option value="12h" selected>Posted: 12 hours</option>
+          <option value="24h">Posted: 24 hours</option>
+        </select>
+
+        <label class="sr-only" for="sort">Sort tickets</label>
+        <select id="sort" class="rail-select">
+          <option value="velocity">Sort: Pace</option>
+          <option value="votes">Sort: Tally</option>
+          <option value="posted">Sort: Newest</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="rail-status">
+      <div id="results-meta" aria-live="polite"></div>
+      <div class="rail-update">
+        <span id="last-updated"></span>
+        <span id="next-refresh"></span>
       </div>
     </div>
   </header>
 
-  <main class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-    <div class="mb-4 grid grid-cols-2 gap-2 sm:mb-5 sm:gap-3 lg:grid-cols-[1fr_auto_auto]">
-      <input
-        id="search"
-        type="search"
-        placeholder="Search deals or stores..."
-        class="control-field col-span-2 lg:col-span-1"
-      />
-      <select id="posted-window" class="control-field">
-        <option value="3h">Posted: 3 hours</option>
-        <option value="6h">Posted: 6 hours</option>
-        <option value="9h">Posted: 9 hours</option>
-        <option value="12h" selected>Posted: 12 hours</option>
-        <option value="24h">Posted: 24 hours</option>
-      </select>
-      <select id="sort" class="control-field">
-        <option value="velocity">Sort: Velocity</option>
-        <option value="votes">Sort: Votes</option>
-        <option value="posted">Sort: Newest</option>
-      </select>
-    </div>
-
-    <div id="results-meta" class="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-zinc-500"></div>
-    <div id="deals-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5"></div>
-    <div id="pagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
+  <main class="ticket-counter">
+    <div id="deals-list" class="ticket-grid"></div>
+    <nav id="pagination" class="pagination" aria-label="Ticket pages"></nav>
   </main>
 
   <script src="/app.js"></script>
