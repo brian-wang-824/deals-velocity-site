@@ -94,8 +94,10 @@
   }
 
   .site-logo img {
-    width: 1.65rem;
-    height: 2.5rem;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .rail-brand-copy h1 {
