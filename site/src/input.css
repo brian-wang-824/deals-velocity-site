@@ -230,7 +230,7 @@
   }
 
   .ticket-photo {
-    aspect-ratio: 16 / 10;
+    height: 10rem;
     overflow: hidden;
     border-bottom: 1px dashed var(--paper-line);
     background: var(--paper-dim);
@@ -239,7 +239,9 @@
   .ticket-photo img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    padding: 0.7rem;
+    object-fit: contain;
+    object-position: center;
   }
 
   .ticket-body {
