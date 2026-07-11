@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +33,32 @@ DATA_DIR = REPO_ROOT / "site" / "public" / "data"
 HISTORY_FILE = DATA_DIR / "history.json"
 DEALS_FILE = DATA_DIR / "deals.json"
 MAX_SNAPSHOTS = 48  # ~8 hours of history at a 10-minute cadence
+
+
+def dispatch_notifications(snapshot: dict) -> bool:
+    """Best-effort notification dispatch; scraping must succeed independently."""
+    url = os.environ.get("SUPABASE_NOTIFICATION_PROCESS_URL", "").strip()
+    secret = os.environ.get("SCRAPE_DISPATCH_SECRET", "").strip()
+    if not url or not secret:
+        print("Notification dispatch not configured; skipping.")
+        return False
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(snapshot, separators=(",", ":")).encode("utf-8"),
+        headers={"Content-Type": "application/json", "X-Scrape-Secret": secret},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            if not 200 <= response.status < 300:
+                print(f"WARNING: notification dispatch returned HTTP {response.status}.")
+                return False
+        print("Notification snapshot dispatched.")
+        return True
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        print(f"WARNING: notification dispatch failed: {exc}")
+        return False
 
 
 def load_history() -> list[dict]:
@@ -81,6 +110,8 @@ async def run() -> None:
 
     _write_json_atomic(HISTORY_FILE, history)
     _write_json_atomic(DEALS_FILE, {"scraped_at": scraped_at, "deals": enriched, "count": len(enriched)})
+
+    dispatch_notifications({"scraped_at": scraped_at, "deals": enriched})
 
     missing_posted_count = sum(1 for d in deals if d.posted_time is None)
     print(f"Scraped {len(deals)} deals from the frontpage. Missing post times: {missing_posted_count}.")

@@ -29,6 +29,9 @@ jobs:
         run: pip install -r requirements-scraper.txt
 
       - name: Run scrape
+        env:
+          SUPABASE_NOTIFICATION_PROCESS_URL: ${{ secrets.SUPABASE_NOTIFICATION_PROCESS_URL }}
+          SCRAPE_DISPATCH_SECRET: ${{ secrets.SCRAPE_DISPATCH_SECRET }}
         run: python scripts/run_scrape.py
 
       - name: Commit updated data

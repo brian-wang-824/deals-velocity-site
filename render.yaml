@@ -4,6 +4,11 @@ services:
     runtime: static
     buildCommand: cd site && npm install && npm run build
     staticPublishPath: site/dist
+    envVars:
+      - key: SUPABASE_NOTIFICATION_FUNCTION_URL
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
     routes:
       - type: rewrite
         source: /*

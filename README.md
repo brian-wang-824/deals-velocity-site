@@ -66,3 +66,30 @@ The production build writes minified CSS and required static assets to `site/dis
 ## Automation and deployment
 
 `.github/workflows/scrape.yml` runs every ten minutes and commits updated `history.json` and `deals.json` files. `render.yaml` configures the Render static site to run `npm install && npm run build`, publish `site/dist`, and disable caching for JSON data.
+
+## Push notifications
+
+The site supports anonymous, per-device Web Push subscriptions for the six stamped velocity levels. Render continues to host the static PWA, while Supabase stores subscriptions and sends notifications after each successful scrape.
+
+### Supabase setup
+
+1. Create a Supabase project and install the Supabase CLI.
+2. Link the repository and apply `supabase/migrations/202607110001_push_notifications.sql` with `supabase db push`.
+3. Generate VAPID keys (for example, `npx web-push generate-vapid-keys`) and deploy the function:
+
+```powershell
+supabase secrets set VAPID_PUBLIC_KEY="..." VAPID_PRIVATE_KEY="..." VAPID_SUBJECT="mailto:you@example.com" SCRAPE_DISPATCH_SECRET="..." SITE_ORIGIN="https://your-site.example"
+supabase functions deploy notifications --no-verify-jwt
+```
+
+Set these Render build environment variables:
+
+- `SUPABASE_NOTIFICATION_FUNCTION_URL=https://PROJECT_REF.supabase.co/functions/v1/notifications`
+- `VAPID_PUBLIC_KEY` to the same public VAPID key stored in Supabase.
+
+Set these GitHub Actions repository secrets:
+
+- `SUPABASE_NOTIFICATION_PROCESS_URL=https://PROJECT_REF.supabase.co/functions/v1/notifications/process`
+- `SCRAPE_DISPATCH_SECRET` to the same random secret stored in Supabase.
+
+If the GitHub secrets are absent or notification delivery is unavailable, scraping, committing data, and Render deployment continue normally. On iPhone and iPad, Web Push requires installing the site to the Home Screen.

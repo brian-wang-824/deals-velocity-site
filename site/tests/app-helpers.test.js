@@ -183,4 +183,14 @@ assert.ok(!browserSource.includes("?."), "TV browser bundle must not use optiona
 assert.ok(!browserSource.includes("??"), "TV browser bundle must not use nullish coalescing");
 assert.ok(!/\d_\d/.test(browserSource), "TV browser bundle must not use numeric separators");
 
+const workerSource = fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
+assert.ok(workerSource.includes('self.addEventListener("push"'));
+assert.ok(workerSource.includes('self.addEventListener("notificationclick"'));
+assert.ok(workerSource.includes("clients.openWindow(url)"));
+
+const notificationsSource = fs.readFileSync(path.join(__dirname, "../public/notifications.js"), "utf8");
+assert.ok(notificationsSource.includes("Notification.requestPermission()"));
+assert.ok(notificationsSource.includes("applicationServerKey"));
+assert.ok(notificationsSource.includes("Select at least one stamp first."));
+
 console.log("app helper tests passed");

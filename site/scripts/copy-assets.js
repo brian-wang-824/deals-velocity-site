@@ -6,6 +6,8 @@ const dist = path.join(root, "dist");
 const copies = [
   ["src/index.html", "dist/index.html"],
   ["public/app.js", "dist/app.js"],
+  ["public/notifications.js", "dist/notifications.js"],
+  ["public/service-worker.js", "dist/service-worker.js"],
   ["public/favicon.svg", "dist/favicon.svg"],
   ["public/favicon.ico", "dist/favicon.ico"],
   ["public/apple-touch-icon.png", "dist/apple-touch-icon.png"],
@@ -39,3 +41,12 @@ for (const [from, to] of copies) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
 }
+
+const notificationConfig = {
+  edgeFunctionUrl: process.env.SUPABASE_NOTIFICATION_FUNCTION_URL || "",
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY || "",
+};
+fs.writeFileSync(
+  path.join(dist, "notification-config.js"),
+  `window.NOTIFICATION_CONFIG = ${JSON.stringify(notificationConfig)};\n`,
+);

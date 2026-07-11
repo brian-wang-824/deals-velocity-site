@@ -69,6 +69,10 @@
           <option value="votes">Sort: Tally</option>
           <option value="posted">Sort: Newest</option>
         </select>
+
+        <button id="notification-settings-button" type="button" class="rail-notification-button" aria-haspopup="dialog">
+          Alerts
+        </button>
       </div>
     </div>
 
@@ -80,6 +84,34 @@
       </div>
     </div>
   </header>
+
+  <dialog id="notification-settings" class="notification-dialog" aria-labelledby="notification-title">
+    <form method="dialog" class="notification-dialog-shell">
+      <div class="notification-dialog-header">
+        <div>
+          <p class="notification-kicker">Ticket alerts</p>
+          <h2 id="notification-title">Choose your stamps</h2>
+        </div>
+        <button type="submit" class="notification-close" aria-label="Close notification settings">&times;</button>
+      </div>
+      <p class="notification-intro">Get one alert when a deal first reaches any stamp you select.</p>
+      <fieldset id="notification-thresholds" class="notification-thresholds">
+        <legend class="sr-only">Velocity stamps</legend>
+        <label><input type="checkbox" value="warming" /> <span>Warming</span></label>
+        <label><input type="checkbox" value="hot" /> <span>Hot</span></label>
+        <label><input type="checkbox" value="surging" /> <span>Surging</span></label>
+        <label><input type="checkbox" value="blazing" /> <span>Blazing</span></label>
+        <label><input type="checkbox" value="on fire" /> <span>On Fire</span></label>
+        <label><input type="checkbox" value="inferno" /> <span>Inferno</span></label>
+      </fieldset>
+      <p id="notification-platform-note" class="notification-platform-note" hidden></p>
+      <p id="notification-status" class="notification-status" role="status" aria-live="polite">Notifications are off.</p>
+      <div class="notification-actions">
+        <button id="notification-enable" type="button" class="notification-primary">Enable notifications</button>
+        <button id="notification-disable" type="button" class="notification-secondary" hidden>Disable</button>
+      </div>
+    </form>
+  </dialog>
 
   <main class="ticket-counter">
     <div id="deals-list" class="ticket-grid" aria-busy="true">
@@ -93,5 +125,7 @@
   </noscript>
 
   <script src="/app.js"></script>
+  <script src="/notification-config.js"></script>
+  <script src="/notifications.js"></script>
 </body>
 </html>

@@ -6,11 +6,12 @@ JSON files atomically to a temp directory.
 
 import asyncio
 import json
+import os
 import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -112,6 +113,29 @@ class TestRunScrapeEndToEnd(unittest.IsolatedAsyncioTestCase):
         # should not wipe out perfectly good existing data.
         history = json.loads(run_scrape.HISTORY_FILE.read_text())
         self.assertEqual(len(history), 1)
+
+
+class TestNotificationDispatch(unittest.TestCase):
+    def test_skips_when_not_configured(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(run_scrape.dispatch_notifications({"scraped_at": "now", "deals": []}))
+
+    def test_posts_snapshot_with_shared_secret(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        snapshot = {"scraped_at": "2026-07-11T00:00:00Z", "deals": [{"thread_id": "1"}]}
+        with patch.dict(os.environ, {
+            "SUPABASE_NOTIFICATION_PROCESS_URL": "https://example.test/process",
+            "SCRAPE_DISPATCH_SECRET": "secret",
+        }), patch.object(run_scrape.urllib.request, "urlopen", return_value=response) as urlopen:
+            self.assertTrue(run_scrape.dispatch_notifications(snapshot))
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://example.test/process")
+        self.assertEqual(request.get_header("X-scrape-secret"), "secret")
+        self.assertEqual(json.loads(request.data), snapshot)
 
 
 def _asdict_deal(deal):

@@ -1,0 +1,4 @@
+project_id = "deals-velocity-site"
+
+[functions.notifications]
+verify_jwt = false
