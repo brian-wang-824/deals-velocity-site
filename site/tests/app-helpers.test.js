@@ -202,7 +202,7 @@ const workerSource = fs.readFileSync(path.join(__dirname, "../public/service-wor
 assert.ok(workerSource.includes('self.addEventListener("push"'));
 assert.ok(workerSource.includes('self.addEventListener("notificationclick"'));
 assert.ok(workerSource.includes("clients.openWindow(url)"));
-assert.ok(workerSource.includes('badge: "/icons/notification-badge.svg"'));
+assert.ok(workerSource.includes('badge: "/icons/notification-badge.png"'));
 
 const notificationsSource = fs.readFileSync(path.join(__dirname, "../public/notifications.js"), "utf8");
 assert.ok(notificationsSource.includes("Notification.requestPermission()"));
