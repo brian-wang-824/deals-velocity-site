@@ -449,7 +449,7 @@
     border: 0;
     background: linear-gradient(110deg, var(--ketchup) 0 42%, var(--mustard) 50%, var(--ketchup) 58% 100%);
     background-size: 240% 100%;
-    padding: 0.7rem 1.35rem;
+    padding: 0.7rem 1.75rem;
     color: var(--paper);
     filter: drop-shadow(0 0 0.5rem rgba(232, 67, 47, 0.62));
     font-size: 0.72rem;
