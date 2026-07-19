@@ -1,6 +1,6 @@
 const REFRESH_INTERVAL_MINUTES = 10;
 const PAGE_SIZE = 25;
-const POLL_FOR_NEW_DATA_MS = 60000; // check for a fresh deals.json every minute
+const POLL_FOR_NEW_DATA_MS = 60000; // check the small publication pointer every minute
 const POSTED_WINDOW_HOURS = {
   "3h": 3,
   "6h": 6,
@@ -23,6 +23,7 @@ let allDeals = [];
 let scrapedAtIso = null;
 let currentPage = 1;
 let countdownTimer = null;
+let publishedDealsLoader = null;
 
 const els = HAS_DOCUMENT
   ? {
@@ -262,7 +263,7 @@ function applyFiltersAndSort() {
   if (sort === "discount") sorted = sortDealsByDiscount(filtered);
   else if (sort === "votes") sorted.sort((a, b) => b.votes - a.votes);
   else if (sort === "posted") sorted = sortDealsByNewest(filtered);
-  // "velocity" (default) keeps the server-computed order from deals.json
+  // "velocity" (default) keeps the server-computed order from the published snapshot
 
   return sorted;
 }
@@ -371,21 +372,203 @@ function renderCountdown() {
   countdownTimer = setInterval(tick, 1000);
 }
 
+function normalizeDataConfig(value) {
+  const config = value && typeof value === "object" ? value : {};
+  const publicationUrl = String(config.publicationUrl || "").trim();
+  const snapshotBaseUrl = String(config.snapshotBaseUrl || "").trim();
+  const publishableKey = String(config.publishableKey || "").trim();
+
+  if (!publicationUrl || !snapshotBaseUrl || !publishableKey) {
+    throw new Error("Published deal data is not configured.");
+  }
+
+  return {
+    publicationUrl,
+    snapshotBaseUrl,
+    publishableKey,
+  };
+}
+
+function normalizePublication(value) {
+  const rows = Array.isArray(value) ? value : [value];
+  if (rows.length !== 1 || !rows[0] || typeof rows[0] !== "object") {
+    throw new Error("The latest deal publication is unavailable.");
+  }
+
+  const row = rows[0];
+  const version = typeof row.version === "string" ? row.version.trim() : "";
+  const snapshotPath = String(row.snapshot_path || "").trim();
+  const scrapedAt = String(row.scraped_at || "").trim();
+  const dealCount = row.deal_count;
+  const snapshotPathMatch = snapshotPath.match(
+    /^v1\/\d{4}\/\d{2}\/\d{2}\/([0-9a-f]{64})\.json$/,
+  );
+
+  if (
+    !/^[0-9a-f]{64}$/.test(version) ||
+    !snapshotPathMatch ||
+    snapshotPathMatch[1] !== version ||
+    !scrapedAt ||
+    Number.isNaN(Date.parse(scrapedAt)) ||
+    !Number.isInteger(dealCount) ||
+    dealCount < 0
+  ) {
+    throw new Error("The latest deal publication is invalid.");
+  }
+
+  return { version, snapshotPath, scrapedAt, dealCount };
+}
+
+function buildSnapshotUrl(baseUrl, snapshotPath) {
+  const base = String(baseUrl || "").trim().replace(/\/+$/, "");
+  const path = String(snapshotPath || "").trim();
+  const segments = path.split("/");
+
+  if (!/^https?:\/\//i.test(base) || !path || segments.some((segment) => (
+    !segment || segment === "." || segment === ".."
+  ))) {
+    throw new Error("The published deal snapshot path is invalid.");
+  }
+
+  return `${base}/${segments.map((segment) => encodeURIComponent(segment)).join("/")}`;
+}
+
+function normalizeSnapshot(value, publication) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !Array.isArray(value.deals) ||
+    !Number.isInteger(value.count) ||
+    value.count < 0
+  ) {
+    throw new Error("The published deal snapshot is invalid.");
+  }
+
+  const snapshotScrapedAt = String(value.scraped_at || "").trim();
+  const snapshotTime = Date.parse(snapshotScrapedAt);
+  const publicationTime = Date.parse(publication.scrapedAt);
+  if (
+    !snapshotScrapedAt ||
+    Number.isNaN(snapshotTime) ||
+    snapshotTime !== publicationTime ||
+    value.count !== value.deals.length ||
+    value.count !== publication.dealCount
+  ) {
+    throw new Error("The published deal snapshot does not match its publication.");
+  }
+
+  return {
+    scrapedAt: snapshotScrapedAt,
+    deals: value.deals,
+    count: value.count,
+  };
+}
+
+async function fetchJson(fetchImpl, url, options, label) {
+  const response = await fetchImpl(url, options);
+  if (!response.ok) {
+    throw new Error(`${label} request failed (HTTP ${response.status}).`);
+  }
+  return await response.json();
+}
+
+function createPublishedDealsLoader(options) {
+  const fetchImpl = options.fetchImpl;
+  const onSnapshot = options.onSnapshot;
+  let currentVersion = null;
+  let currentScrapedAtMs = Number.NEGATIVE_INFINITY;
+  let requestSequence = 0;
+  let latestAppliedRequest = 0;
+  let inFlight = null;
+
+  async function loadOnce(requestId) {
+    const config = normalizeDataConfig(options.config);
+    const publicationValue = await fetchJson(
+      fetchImpl,
+      config.publicationUrl,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          apikey: config.publishableKey,
+        },
+      },
+      "Deal publication",
+    );
+    const publication = normalizePublication(publicationValue);
+    const publicationTime = Date.parse(publication.scrapedAt);
+
+    if (publication.version === currentVersion) {
+      return { updated: false, version: currentVersion };
+    }
+    if (publicationTime < currentScrapedAtMs) {
+      return { updated: false, version: currentVersion, superseded: true };
+    }
+
+    const snapshotUrl = buildSnapshotUrl(config.snapshotBaseUrl, publication.snapshotPath);
+    const snapshotValue = await fetchJson(
+      fetchImpl,
+      snapshotUrl,
+      { cache: "force-cache" },
+      "Deal snapshot",
+    );
+    const snapshot = normalizeSnapshot(snapshotValue, publication);
+
+    // The in-flight guard serializes normal polling. The sequence check also
+    // prevents a superseded response from being committed if loading behavior
+    // changes to allow replacement requests in the future.
+    if (requestId < latestAppliedRequest || publicationTime < currentScrapedAtMs) {
+      return { updated: false, version: currentVersion, superseded: true };
+    }
+
+    onSnapshot(snapshot, publication);
+    currentVersion = publication.version;
+    currentScrapedAtMs = publicationTime;
+    latestAppliedRequest = requestId;
+    return { updated: true, version: currentVersion };
+  }
+
+  function load() {
+    if (inFlight) return inFlight;
+
+    const requestId = ++requestSequence;
+    const request = loadOnce(requestId);
+    inFlight = request;
+    const clearInFlight = () => {
+      if (inFlight === request) inFlight = null;
+    };
+    request.then(clearInFlight, clearInFlight);
+    return request;
+  }
+
+  return {
+    load,
+    getCurrentVersion: () => currentVersion,
+  };
+}
+
+function getPublishedDealsLoader() {
+  if (!publishedDealsLoader) {
+    const dataConfig = typeof window !== "undefined" ? window.DATA_CONFIG : null;
+    publishedDealsLoader = createPublishedDealsLoader({
+      config: dataConfig,
+      fetchImpl: (url, options) => fetch(url, options),
+      onSnapshot: (snapshot) => {
+        // Validate the complete snapshot before swapping either piece of UI state.
+        allDeals = snapshot.deals;
+        scrapedAtIso = snapshot.scrapedAt;
+        renderDeals();
+        renderCountdown();
+      },
+    });
+  }
+  return publishedDealsLoader;
+}
+
 async function loadDeals(options) {
   const silent = Boolean(options && options.silent);
   try {
-    const res = await fetch(`/data/deals.json?ts=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    const isNewSnapshot = data.scraped_at !== scrapedAtIso;
-    allDeals = data.deals || [];
-    scrapedAtIso = data.scraped_at;
-
-    if (!silent || isNewSnapshot) {
-      renderDeals();
-    }
-    renderCountdown();
+    return await getPublishedDealsLoader().load();
   } catch (err) {
     if (!silent) {
       els.resultsMeta.textContent = "Counter unavailable";
@@ -397,7 +580,8 @@ async function loadDeals(options) {
       const retryButton = els.dealsList.querySelector(".retry-button");
       if (retryButton) retryButton.addEventListener("click", () => loadDeals());
     }
-    console.error("Failed to load deals.json", err);
+    console.error("Failed to load published deals", err);
+    return { updated: false, error: err };
   }
 }
 
@@ -433,5 +617,10 @@ if (typeof module !== "undefined") {
     renderVelocityHeat,
     sortDealsByNewest,
     sortDealsByDiscount,
+    buildSnapshotUrl,
+    createPublishedDealsLoader,
+    normalizeDataConfig,
+    normalizePublication,
+    normalizeSnapshot,
   };
 }

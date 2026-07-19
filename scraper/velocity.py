@@ -1,11 +1,9 @@
-"""Compute thumbs-up velocity metrics from a rolling window of JSON snapshots.
+"""Compute thumbs-up velocity from a compact rolling observation window.
 
-Previously this queried Postgres/SQLite per-thread for "previous" and
-"first" observations. There is no database anymore -- `history` is a small
-in-memory list of recent snapshot dicts (as written to history.json by
-scripts/run_scrape.py), so we build the same "previous / first observation
-per thread_id" lookup with a single pass over that list instead of any
-network or disk round trips.
+Only the latest deal payload needs every display field. Historical snapshots
+store a timestamp plus ``thread_id -> votes`` pairs, which keeps the private
+state small enough to fetch on every ten-minute scrape without meaningful
+bandwidth or storage growth.
 """
 
 from __future__ import annotations
@@ -17,13 +15,10 @@ from .scraper import _parse_price_to_float
 
 
 def _parse_iso(value: str) -> datetime:
-    try:
-        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except ValueError:
-        return datetime.now(timezone.utc)
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _hours_between(start: datetime, end: datetime) -> float:
@@ -71,51 +66,45 @@ def _velocity_label(recent: Optional[float], lifetime: Optional[float]) -> Optio
     return None
 
 
-def enrich_deals_with_velocity(history: list[dict]) -> list[dict]:
-    """Compute velocity metrics for the most recent snapshot in `history`.
+def enrich_deals_with_velocity(
+    current_deals: list[dict],
+    current_scraped_at: str,
+    snapshots: list[dict],
+) -> list[dict]:
+    """Enrich the current full deals from compact vote observations.
 
-    `history` is a list of {"scraped_at": iso_str, "deals": [deal_dict, ...]}
-    ordered oldest-to-newest, exactly as persisted in history.json.
+    ``snapshots`` must be chronological and include the current observation as
+    its final entry. Each snapshot has the form
+    ``{"scraped_at": <ISO string>, "votes": {<thread id>: <integer>}}``.
+    The caller validates that contract before invoking this function.
     """
-    if not history:
+    if not current_deals:
         return []
 
-    latest = history[-1]
-    current_time = _parse_iso(latest["scraped_at"])
-    current_deals = latest["deals"]
-
-    # One pass over history to build, per thread_id, the full list of
-    # (snapshot_time, deal_dict) observations in chronological order.
-    thread_history: dict[str, list[tuple[datetime, dict]]] = {}
-    for snapshot in history:
-        snap_time = _parse_iso(snapshot["scraped_at"])
-        for deal in snapshot["deals"]:
-            thread_history.setdefault(deal["thread_id"], []).append((snap_time, deal))
+    current_time = _parse_iso(current_scraped_at)
+    thread_history: dict[str, list[tuple[datetime, int]]] = {}
+    for snapshot in snapshots:
+        snapshot_time = _parse_iso(snapshot["scraped_at"])
+        for thread_id, votes in snapshot["votes"].items():
+            thread_history.setdefault(thread_id, []).append((snapshot_time, votes))
 
     enriched: list[dict] = []
     for deal in current_deals:
         thread_id = deal["thread_id"]
-        observations = thread_history.get(thread_id, [(current_time, deal)])
+        current_votes = deal["votes"]
+        observations = thread_history.get(thread_id, [(current_time, current_votes)])
 
-        prior = [obs for obs in observations if obs[0] < current_time]
-        prev_time, prev_deal = prior[-1] if prior else (None, None)
-        first_time, first_deal = observations[0]
+        prior = [observation for observation in observations if observation[0] < current_time]
+        previous_time, previous_votes = prior[-1] if prior else (None, None)
+        first_time, first_votes = observations[0]
 
-        prev_votes = prev_deal["votes"] if prev_deal else None
-        first_votes = first_deal["votes"] if first_deal else deal["votes"]
-
-        recent_velocity = compute_velocity(deal["votes"], current_time, prev_votes, prev_time)
-        # BUGFIX: if this thread's only observation *is* the current one
-        # (first_time == current_time), there's no real earlier data point
-        # to compare against. Without this guard, compute_velocity divides
-        # by the 1-minute floor and reports a false 0.0 for deals that have
-        # genuinely never been scraped before. No heat is assigned until a
-        # second observation exists.
-        if first_time < current_time:
-            lifetime_velocity = compute_velocity(deal["votes"], current_time, first_votes, first_time)
-        else:
-            lifetime_velocity = None
-        vote_delta = deal["votes"] - prev_votes if prev_votes is not None else None
+        recent_velocity = compute_velocity(current_votes, current_time, previous_votes, previous_time)
+        lifetime_velocity = (
+            compute_velocity(current_votes, current_time, first_votes, first_time)
+            if first_time < current_time
+            else None
+        )
+        vote_delta = current_votes - previous_votes if previous_votes is not None else None
         discount_percentage = _calculate_discount_percentage(deal.get("price"), deal.get("original_price"))
 
         enriched.append(
@@ -127,7 +116,7 @@ def enrich_deals_with_velocity(history: list[dict]) -> list[dict]:
                 "price": deal["price"],
                 "original_price": deal["original_price"],
                 "discount_percentage": discount_percentage,
-                "votes": deal["votes"],
+                "votes": current_votes,
                 "comments": deal["comments"],
                 "views": deal["views"],
                 "posted_label": deal.get("posted_label"),
@@ -144,10 +133,10 @@ def enrich_deals_with_velocity(history: list[dict]) -> list[dict]:
         )
 
     enriched.sort(
-        key=lambda d: (
-            d["recent_velocity"] is not None,
-            d["recent_velocity"] or 0,
-            d["votes"],
+        key=lambda deal: (
+            deal["recent_velocity"] is not None,
+            deal["recent_velocity"] or 0,
+            deal["votes"],
         ),
         reverse=True,
     )

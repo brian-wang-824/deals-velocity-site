@@ -4,7 +4,16 @@ services:
     runtime: static
     buildCommand: cd site && npm install && npm run build
     staticPublishPath: site/dist
+    buildFilter:
+      ignoredPaths:
+        - site/public/data/**
     envVars:
+      - key: SUPABASE_DATA_PUBLICATION_URL
+        sync: false
+      - key: SUPABASE_DATA_SNAPSHOT_BASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
       - key: SUPABASE_NOTIFICATION_FUNCTION_URL
         sync: false
       - key: VAPID_PUBLIC_KEY
@@ -13,7 +22,3 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
-    headers:
-      - path: /data/*.json
-        name: Cache-Control
-        value: no-cache

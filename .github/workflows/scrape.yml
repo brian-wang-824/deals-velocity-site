@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: scrape
@@ -28,14 +28,8 @@ jobs:
 
       - name: Run scrape
         env:
+          SUPABASE_DEAL_DATA_FUNCTION_URL: ${{ secrets.SUPABASE_DEAL_DATA_FUNCTION_URL }}
+          DEAL_DATA_PUBLISH_SECRET: ${{ secrets.DEAL_DATA_PUBLISH_SECRET }}
           SUPABASE_NOTIFICATION_PROCESS_URL: ${{ secrets.SUPABASE_NOTIFICATION_PROCESS_URL }}
           SCRAPE_DISPATCH_SECRET: ${{ secrets.SCRAPE_DISPATCH_SECRET }}
         run: python scripts/run_scrape.py
-
-      - name: Commit updated data
-        run: |
-          git config user.name "deals-bot"
-          git config user.email "deals-bot@users.noreply.github.com"
-          git add site/public/data/history.json site/public/data/deals.json
-          git diff --staged --quiet || git commit -m "chore: update deals snapshot [skip ci]"
-          git push

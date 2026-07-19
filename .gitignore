@@ -12,6 +12,7 @@ venv/
 site/node_modules/
 site/dist/
 site/public/style.css
+site/public/data/*.json
 .pnpm-store/
 
 # Local review artifacts
