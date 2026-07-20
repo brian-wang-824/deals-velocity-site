@@ -140,6 +140,9 @@ For Web Push, also set:
 
 The site supports anonymous, per-device Web Push subscriptions for the six heat levels. Supabase stores subscriptions and sends notifications after each successful scrape.
 
+Deal alerts use high Web Push urgency because they always produce a time-sensitive, user-visible notification.
+They request a 24-hour retention window so an alert delayed by an overnight Android Doze interval remains eligible for delivery, while preventing deals from arriving more than a day stale.
+
 Apply the notification migrations, configure secrets, and deploy the function:
 
 ```powershell

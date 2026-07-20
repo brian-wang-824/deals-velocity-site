@@ -3,9 +3,15 @@ import {
   ALLOWED_THRESHOLDS,
   enteredHigherHeat,
   normalizeThresholds,
+  PUSH_DELIVERY_OPTIONS,
 } from "../../supabase/functions/notifications/logic.mjs";
 
 assert.deepEqual(ALLOWED_THRESHOLDS, ["warming", "hot", "surging", "blazing", "on fire", "inferno"]);
+assert.deepEqual(
+  PUSH_DELIVERY_OPTIONS,
+  { TTL: 24 * 60 * 60, urgency: "high" },
+  "Android delivery requests immediate delivery and one-day retention for Doze",
+);
 assert.deepEqual(normalizeThresholds(["inferno", "bogus", "warming", "inferno"]), ["warming", "inferno"]);
 assert.deepEqual(normalizeThresholds(null), []);
 
