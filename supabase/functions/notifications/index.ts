@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { enteredHigherHeat, normalizeThresholds } from "./logic.mjs";
+import { enteredHigherHeat, normalizeThresholds, PUSH_DELIVERY_OPTIONS } from "./logic.mjs";
 
 const cors = {
   "Access-Control-Allow-Origin": Deno.env.get("SITE_ORIGIN") || "*",
@@ -142,7 +142,7 @@ async function sendDelivery(subscription: any, deal: any): Promise<boolean> {
       body: notificationBody(deal), url: deal.url || "/",
       tag: `${deal.thread_id}:${deal.velocity_label}`,
       icon: deal.image_url || "/icons/app-icon-192.png",
-    }), { TTL: 3600, urgency: "normal" });
+    }), PUSH_DELIVERY_OPTIONS);
     await markDelivery(subscription.id, deal, {
       status: "delivered", delivered_at: new Date().toISOString(), error_message: null,
     });
