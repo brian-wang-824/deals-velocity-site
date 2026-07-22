@@ -1,6 +1,33 @@
 const REFRESH_INTERVAL_MINUTES = 10;
 const PAGE_SIZE = 25;
 const POLL_FOR_NEW_DATA_MS = 60000; // check the small publication pointer every minute
+const PUBLISHED_DATA_REQUEST_TIMEOUT_MS = 15000;
+const MAX_PUBLISHED_DEALS = 1000;
+// Mirror the publisher's deal contract so a corrupted public object cannot replace valid UI state.
+const PUBLISHED_DEAL_FIELDS = [
+  "comments",
+  "discount_percentage",
+  "found_by",
+  "image_url",
+  "is_new",
+  "lifetime_velocity",
+  "original_price",
+  "posted_label",
+  "posted_time",
+  "posted_time_source",
+  "price",
+  "recent_velocity",
+  "store",
+  "thread_id",
+  "title",
+  "url",
+  "velocity_label",
+  "views",
+  "vote_delta",
+  "votes",
+];
+const PUBLISHED_VELOCITY_LABELS = new Set(["warming", "hot", "surging", "blazing", "on fire", "inferno"]);
+const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 const POSTED_WINDOW_HOURS = {
   "3h": 3,
   "6h": 6,
@@ -320,8 +347,18 @@ function renderDealCard(d) {
 }
 
 function renderPagination(totalPages) {
+  const focusedPaginationControl = (
+    HAS_DOCUMENT &&
+    document.activeElement &&
+    els.pagination.contains(document.activeElement)
+  ) ? document.activeElement : null;
+  const focusedPaginationLabel = focusedPaginationControl
+    ? focusedPaginationControl.getAttribute("aria-label")
+    : null;
+
   if (totalPages <= 1) {
     els.pagination.innerHTML = "";
+    if (focusedPaginationControl) els.resultsMeta.focus();
     return;
   }
   const buttons = [
@@ -342,14 +379,22 @@ function renderPagination(totalPages) {
     } aria-label="Next page">Next</button>`,
   );
   els.pagination.innerHTML = buttons.join("");
-  els.pagination.querySelectorAll("button:not(:disabled)").forEach((btn) => {
+  const enabledButtons = Array.from(els.pagination.querySelectorAll("button:not(:disabled)"));
+  enabledButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       currentPage = Number(btn.dataset.page);
       renderDeals();
+      els.resultsMeta.focus();
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
     });
   });
+  if (focusedPaginationLabel) {
+    const replacement = enabledButtons.find(
+      (button) => button.getAttribute("aria-label") === focusedPaginationLabel,
+    ) || enabledButtons.find((button) => button.getAttribute("aria-current") === "page");
+    if (replacement) replacement.focus();
+  }
 }
 
 function renderCountdown() {
@@ -433,6 +478,52 @@ function buildSnapshotUrl(baseUrl, snapshotPath) {
   return `${base}/${segments.map((segment) => encodeURIComponent(segment)).join("/")}`;
 }
 
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasPublishedDealFields(deal) {
+  return PUBLISHED_DEAL_FIELDS.every(
+    (field) => Object.prototype.hasOwnProperty.call(deal, field),
+  );
+}
+
+function isNullableString(value) {
+  return value === null || typeof value === "string";
+}
+
+function isNullableFiniteNumber(value) {
+  return value === null || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isValidPublishedDeal(deal) {
+  if (!isRecord(deal) || !hasPublishedDealFields(deal)) return false;
+  if (typeof deal.thread_id !== "string" || !deal.thread_id || deal.thread_id.length > 128) return false;
+  if (!["title", "url", "store"].every((field) => typeof deal[field] === "string")) return false;
+  if (![
+    "price",
+    "original_price",
+    "posted_label",
+    "posted_time_source",
+    "found_by",
+    "image_url",
+  ].every((field) => isNullableString(deal[field]))) return false;
+  if (deal.posted_time !== null && !(
+    typeof deal.posted_time === "string" &&
+    ISO_UTC_PATTERN.test(deal.posted_time) &&
+    Number.isFinite(Date.parse(deal.posted_time))
+  )) return false;
+  if (!Number.isSafeInteger(deal.votes)) return false;
+  if (!Number.isSafeInteger(deal.comments) || deal.comments < 0) return false;
+  if (!Number.isSafeInteger(deal.views) || deal.views < 0) return false;
+  if (typeof deal.is_new !== "boolean") return false;
+  if (!["discount_percentage", "recent_velocity", "lifetime_velocity"].every(
+    (field) => isNullableFiniteNumber(deal[field]),
+  )) return false;
+  if (deal.vote_delta !== null && !Number.isSafeInteger(deal.vote_delta)) return false;
+  return deal.velocity_label === null || PUBLISHED_VELOCITY_LABELS.has(deal.velocity_label);
+}
+
 function normalizeSnapshot(value, publication) {
   if (
     !value ||
@@ -457,6 +548,17 @@ function normalizeSnapshot(value, publication) {
     throw new Error("The published deal snapshot does not match its publication.");
   }
 
+  if (value.deals.length > MAX_PUBLISHED_DEALS) {
+    throw new Error("The published deal snapshot contains an invalid deal.");
+  }
+  const threadIds = new Set();
+  for (const deal of value.deals) {
+    if (!isValidPublishedDeal(deal) || threadIds.has(deal.thread_id)) {
+      throw new Error("The published deal snapshot contains an invalid deal.");
+    }
+    threadIds.add(deal.thread_id);
+  }
+
   return {
     scrapedAt: snapshotScrapedAt,
     deals: value.deals,
@@ -464,17 +566,59 @@ function normalizeSnapshot(value, publication) {
   };
 }
 
-async function fetchJson(fetchImpl, url, options, label) {
-  const response = await fetchImpl(url, options);
-  if (!response.ok) {
-    throw new Error(`${label} request failed (HTTP ${response.status}).`);
+async function fetchJson(fetchImpl, url, options, label, timeoutOptions) {
+  const configuredTimeoutMs = Number(timeoutOptions && timeoutOptions.requestTimeoutMs);
+  const timeoutMs = Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+    ? configuredTimeoutMs
+    : PUBLISHED_DATA_REQUEST_TIMEOUT_MS;
+  const setTimeoutImpl = timeoutOptions && timeoutOptions.setTimeoutImpl
+    ? timeoutOptions.setTimeoutImpl
+    : setTimeout;
+  const clearTimeoutImpl = timeoutOptions && timeoutOptions.clearTimeoutImpl
+    ? timeoutOptions.clearTimeoutImpl
+    : clearTimeout;
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const requestOptions = controller
+    ? Object.assign({}, options, { signal: controller.signal })
+    : options;
+  const timeoutError = new Error(`${label} request timed out.`);
+  let timedOut = false;
+  let timeoutId;
+  const timeoutPromise = new Promise((_resolve, reject) => {
+    timeoutId = setTimeoutImpl(() => {
+      timedOut = true;
+      if (controller) controller.abort();
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+  const requestPromise = (async () => {
+    try {
+      const response = await fetchImpl(url, requestOptions);
+      if (!response.ok) {
+        throw new Error(`${label} request failed (HTTP ${response.status}).`);
+      }
+      return await response.json();
+    } catch (error) {
+      if (timedOut) throw timeoutError;
+      throw error;
+    }
+  })();
+
+  try {
+    return await Promise.race([requestPromise, timeoutPromise]);
+  } finally {
+    clearTimeoutImpl(timeoutId);
   }
-  return await response.json();
 }
 
 function createPublishedDealsLoader(options) {
   const fetchImpl = options.fetchImpl;
   const onSnapshot = options.onSnapshot;
+  const timeoutOptions = {
+    requestTimeoutMs: options.requestTimeoutMs,
+    setTimeoutImpl: options.setTimeoutImpl,
+    clearTimeoutImpl: options.clearTimeoutImpl,
+  };
   let currentVersion = null;
   let currentScrapedAtMs = Number.NEGATIVE_INFINITY;
   let requestSequence = 0;
@@ -494,6 +638,7 @@ function createPublishedDealsLoader(options) {
         },
       },
       "Deal publication",
+      timeoutOptions,
     );
     const publication = normalizePublication(publicationValue);
     const publicationTime = Date.parse(publication.scrapedAt);
@@ -511,6 +656,7 @@ function createPublishedDealsLoader(options) {
       snapshotUrl,
       { cache: "force-cache" },
       "Deal snapshot",
+      timeoutOptions,
     );
     const snapshot = normalizeSnapshot(snapshotValue, publication);
 
@@ -565,8 +711,18 @@ function getPublishedDealsLoader() {
   return publishedDealsLoader;
 }
 
+function renderLoadingState(focusLoading) {
+  els.resultsMeta.textContent = "";
+  els.dealsList.setAttribute("aria-busy", "true");
+  els.dealsList.innerHTML = '<p class="ticket-state" role="status">Counting the latest tickets...</p>';
+  els.pagination.innerHTML = "";
+  if (focusLoading) els.dealsList.focus();
+}
+
 async function loadDeals(options) {
   const silent = Boolean(options && options.silent);
+  const focusLoading = Boolean(options && options.focusLoading);
+  if (!silent) renderLoadingState(focusLoading);
   try {
     return await getPublishedDealsLoader().load();
   } catch (err) {
@@ -578,7 +734,7 @@ async function loadDeals(options) {
         <button type="button" class="retry-button">Try again</button>
       </div>`;
       const retryButton = els.dealsList.querySelector(".retry-button");
-      if (retryButton) retryButton.addEventListener("click", () => loadDeals());
+      if (retryButton) retryButton.addEventListener("click", () => loadDeals({ focusLoading: true }));
     }
     console.error("Failed to load published deals", err);
     return { updated: false, error: err };

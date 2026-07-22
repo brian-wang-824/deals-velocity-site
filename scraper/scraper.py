@@ -49,6 +49,7 @@ _YESTERDAY_RE = re.compile(r"Yesterday\s+(\d{1,2}):(\d{2})\s*(AM|PM)", re.IGNORE
 _TODAY_RE = re.compile(r"Today\s+(\d{1,2}):(\d{2})\s*(AM|PM)", re.IGNORECASE)
 _HOURS_AGO_RE = re.compile(r"(\d+)\s*h\s*ago", re.IGNORECASE)
 _MINUTES_AGO_RE = re.compile(r"(\d+)\s*m\s*ago", re.IGNORECASE)
+_CURRENCY_AMOUNT_RE = re.compile(r"\$\s*(\d[\d,]*(?:\.\d+)?)")
 
 _MONTHS = {
     "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
@@ -86,10 +87,15 @@ def _parse_int(value: Optional[str], default: int = 0) -> int:
 
 
 def _parse_price_to_float(price_str: Optional[str]) -> Optional[float]:
-    """Convert price string like '$149' or '$279' to float."""
+    """Convert price text like '$149' or '2 for $0.40' to float."""
     if not price_str:
         return None
-    cleaned = re.sub(r"[^\d.]", "", price_str)
+    currency_amount = _CURRENCY_AMOUNT_RE.search(price_str)
+    cleaned = (
+        currency_amount.group(1).replace(",", "")
+        if currency_amount
+        else re.sub(r"[^\d.]", "", price_str)
+    )
     try:
         return float(cleaned) if cleaned else None
     except ValueError:

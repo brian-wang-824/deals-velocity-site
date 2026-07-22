@@ -755,6 +755,16 @@ html.tv-display {
   }
 }
 
+@media (max-width: 30rem) {
+  .rail-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rail-notification-button {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 22rem) {
   .rail-controls {
     grid-template-columns: 1fr;

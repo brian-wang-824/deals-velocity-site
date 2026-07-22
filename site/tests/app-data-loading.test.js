@@ -55,6 +55,88 @@ const config = {
   publishableKey: "sb_publishable_test",
 };
 
+function publishedDeal(overrides = {}) {
+  return Object.assign({
+    thread_id: "1",
+    title: "Example deal",
+    url: "https://slickdeals.net/f/1",
+    store: "Example store",
+    price: "$10",
+    original_price: "$20",
+    discount_percentage: 50,
+    comments: 2,
+    views: 100,
+    posted_time: "2026-07-18T18:00:00Z",
+    posted_time_source: "card",
+    posted_label: "1 hour ago",
+    found_by: "Example user",
+    is_new: false,
+    image_url: null,
+    recent_velocity: 6,
+    lifetime_velocity: 3,
+    vote_delta: 1,
+    velocity_label: "warming",
+    votes: 10,
+  }, overrides);
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function manualTimers() {
+  const timers = [];
+  return {
+    activeCount() {
+      return timers.filter((timer) => timer.active).length;
+    },
+    setTimeout(callback, delay) {
+      const timer = { active: true, callback, delay };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      if (timer) timer.active = false;
+    },
+    fireNext() {
+      const activeTimers = timers.filter((timer) => timer.active);
+      assert.strictEqual(
+        activeTimers.length,
+        1,
+        "exactly one active request timeout must be scheduled",
+      );
+      const [timer] = activeTimers;
+      timer.active = false;
+      timer.callback();
+    },
+  };
+}
+
+function testManualTimersRejectAmbiguousTimeouts() {
+  const timers = manualTimers();
+  const staleTimer = timers.setTimeout(() => {}, 1000);
+  timers.setTimeout(() => {}, 1000);
+
+  assert.strictEqual(timers.activeCount(), 2);
+  assert.throws(() => timers.fireNext(), /exactly one active request timeout/);
+
+  timers.clearTimeout(staleTimer);
+  assert.strictEqual(timers.activeCount(), 1);
+  timers.fireNext();
+  assert.strictEqual(timers.activeCount(), 0);
+}
+
+async function flush() {
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
 async function testPublicationLifecycle() {
   const firstTime = "2026-07-18T18:20:00Z";
   const secondTime = "2026-07-18T18:30:00Z";
@@ -62,10 +144,10 @@ async function testPublicationLifecycle() {
   const secondPath = snapshotPath(VERSION_TWO);
   const requests = queueFetch([
     jsonResponse(publication(VERSION_ONE, firstPath, "2026-07-18T18:20:00+00:00", 1)),
-    jsonResponse({ scraped_at: firstTime, deals: [{ thread_id: "1", vote_delta: 1 }], count: 1 }),
+    jsonResponse({ scraped_at: firstTime, deals: [publishedDeal({ vote_delta: 1 })], count: 1 }),
     jsonResponse(publication(VERSION_ONE, firstPath, firstTime, 1)),
     jsonResponse(publication(VERSION_TWO, secondPath, secondTime, 1)),
-    jsonResponse({ scraped_at: secondTime, deals: [{ thread_id: "1", vote_delta: 5 }], count: 1 }),
+    jsonResponse({ scraped_at: secondTime, deals: [publishedDeal({ vote_delta: 5 })], count: 1 }),
     jsonResponse(publication(STALE_VERSION, snapshotPath(STALE_VERSION), firstTime, 1)),
   ]);
   const applied = [];
@@ -113,7 +195,7 @@ async function testInvalidSnapshotRetriesSameVersion() {
     jsonResponse(pointer),
     jsonResponse({ scraped_at: scrapedAt, deals: "not-an-array", count: 1 }),
     jsonResponse(pointer),
-    jsonResponse({ scraped_at: scrapedAt, deals: [{ thread_id: "3" }], count: 1 }),
+    jsonResponse({ scraped_at: scrapedAt, deals: [publishedDeal({ thread_id: "3" })], count: 1 }),
   ]);
   const applied = [];
   const loader = createPublishedDealsLoader({
@@ -164,7 +246,105 @@ async function testConcurrentLoadsShareRequest() {
   assert.strictEqual(calls.length, 2);
 }
 
-function browserElement(id, initialValue) {
+async function testPublicationTimeoutReleasesRequest() {
+  const scrapedAt = "2026-07-18T19:00:00Z";
+  const timers = manualTimers();
+  const requests = queueFetch([
+    new Promise(() => {}),
+    jsonResponse(publication(VERSION_ONE, snapshotPath(VERSION_ONE), scrapedAt, 1)),
+    jsonResponse({ scraped_at: scrapedAt, deals: [publishedDeal()], count: 1 }),
+  ]);
+  const applied = [];
+  const loader = createPublishedDealsLoader({
+    config,
+    fetchImpl: requests.fetchImpl,
+    onSnapshot: (snapshot) => applied.push(snapshot),
+    requestTimeoutMs: 1000,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+  });
+
+  const timedOut = loader.load();
+  assert.strictEqual(requests.calls.length, 1);
+  assert.strictEqual(timers.activeCount(), 1, "the pending publication must have one timeout");
+  timers.fireNext();
+  assert.strictEqual(timers.activeCount(), 0);
+  await assert.rejects(timedOut, /Deal publication request timed out/);
+  assert.strictEqual(loader.getCurrentVersion(), null);
+  assert.strictEqual(timers.activeCount(), 0, "the publication timeout must be cleaned up");
+
+  const retried = await loader.load();
+  assert.deepStrictEqual(retried, { updated: true, version: VERSION_ONE });
+  assert.strictEqual(requests.calls.length, 3, "a timeout must release the request for retry");
+  assert.strictEqual(applied.length, 1);
+  assert.strictEqual(timers.activeCount(), 0, "successful retry timers must be cleaned up");
+}
+
+async function testSnapshotTimeoutPreservesLastSnapshot() {
+  const firstTime = "2026-07-18T19:10:00Z";
+  const secondTime = "2026-07-18T19:20:00Z";
+  const timers = manualTimers();
+  const requests = queueFetch([
+    jsonResponse(publication(VERSION_ONE, snapshotPath(VERSION_ONE), firstTime, 1)),
+    jsonResponse({ scraped_at: firstTime, deals: [publishedDeal({ vote_delta: 1 })], count: 1 }),
+    jsonResponse(publication(VERSION_TWO, snapshotPath(VERSION_TWO), secondTime, 1)),
+    new Promise(() => {}),
+    jsonResponse(publication(VERSION_TWO, snapshotPath(VERSION_TWO), secondTime, 1)),
+    jsonResponse({ scraped_at: secondTime, deals: [publishedDeal({ vote_delta: 2 })], count: 1 }),
+  ]);
+  const applied = [];
+  const loader = createPublishedDealsLoader({
+    config,
+    fetchImpl: requests.fetchImpl,
+    onSnapshot: (snapshot) => applied.push(snapshot),
+    requestTimeoutMs: 1000,
+    setTimeoutImpl: timers.setTimeout,
+    clearTimeoutImpl: timers.clearTimeout,
+  });
+
+  await loader.load();
+  assert.strictEqual(timers.activeCount(), 0, "successful initial-load timers must be cleaned up");
+  const timedOut = loader.load();
+  await flush();
+  assert.strictEqual(requests.calls.length, 4, "the refresh must reach the snapshot request");
+  assert.strictEqual(timers.activeCount(), 1, "only the pending snapshot timeout may remain active");
+  timers.fireNext();
+  assert.strictEqual(timers.activeCount(), 0);
+  await assert.rejects(timedOut, /Deal snapshot request timed out/);
+  assert.strictEqual(loader.getCurrentVersion(), VERSION_ONE);
+  assert.strictEqual(applied.length, 1, "a timed-out refresh must retain the last valid snapshot");
+  assert.strictEqual(timers.activeCount(), 0, "the snapshot timeout must be cleaned up");
+
+  const retried = await loader.load();
+  assert.deepStrictEqual(retried, { updated: true, version: VERSION_TWO });
+  assert.strictEqual(requests.calls.length, 6, "snapshot timeout must release the request for retry");
+  assert.strictEqual(applied.length, 2);
+  assert.strictEqual(timers.activeCount(), 0, "successful refresh timers must be cleaned up");
+}
+
+async function testMalformedRefreshPreservesLastSnapshot() {
+  const firstTime = "2026-07-18T19:30:00Z";
+  const secondTime = "2026-07-18T19:40:00Z";
+  const requests = queueFetch([
+    jsonResponse(publication(VERSION_ONE, snapshotPath(VERSION_ONE), firstTime, 1)),
+    jsonResponse({ scraped_at: firstTime, deals: [publishedDeal()], count: 1 }),
+    jsonResponse(publication(VERSION_TWO, snapshotPath(VERSION_TWO), secondTime, 1)),
+    jsonResponse({ scraped_at: secondTime, deals: [null], count: 1 }),
+  ]);
+  const applied = [];
+  const loader = createPublishedDealsLoader({
+    config,
+    fetchImpl: requests.fetchImpl,
+    onSnapshot: (snapshot) => applied.push(snapshot),
+  });
+
+  await loader.load();
+  await assert.rejects(loader.load(), /invalid deal/);
+  assert.strictEqual(loader.getCurrentVersion(), VERSION_ONE);
+  assert.strictEqual(applied.length, 1, "a malformed refresh must retain the last valid snapshot");
+}
+
+function browserElement(id, initialValue, focusState) {
   const listeners = {};
   let html = "";
   const element = {
@@ -173,6 +353,8 @@ function browserElement(id, initialValue) {
     textContent: "",
     attributes: {},
     buttons: [],
+    focusCount: 0,
+    retryButton: null,
     addEventListener: (event, listener) => {
       listeners[event] = listener;
     },
@@ -180,15 +362,49 @@ function browserElement(id, initialValue) {
     setAttribute: (name, value) => {
       element.attributes[name] = value;
     },
-    querySelector: () => null,
+    contains: (candidate) => (
+      candidate === element ||
+      element.buttons.includes(candidate) ||
+      candidate === element.retryButton
+    ),
+    focus: () => {
+      element.focusCount += 1;
+      focusState.activeElement = element;
+    },
+    querySelector: (selector) => {
+      if (selector === ".retry-button") return element.retryButton;
+      return null;
+    },
     querySelectorAll: () => element.buttons.filter((button) => !button.disabled),
   };
 
   Object.defineProperty(element, "innerHTML", {
     get: () => html,
     set: (value) => {
+      const removedFocusedChild = (
+        element.buttons.includes(focusState.activeElement) ||
+        focusState.activeElement === element.retryButton
+      );
       html = value;
       element.buttons = [];
+      element.retryButton = null;
+      if (removedFocusedChild) focusState.activeElement = null;
+      if (id === "deals-list" && /class="retry-button"/.test(value)) {
+        const retryListeners = {};
+        const retryButton = {
+          addEventListener: (event, listener) => {
+            retryListeners[event] = listener;
+          },
+          emit: (event) => {
+            if (event === "click") retryButton.focus();
+            return retryListeners[event] && retryListeners[event]();
+          },
+          focus: () => {
+            focusState.activeElement = retryButton;
+          },
+        };
+        element.retryButton = retryButton;
+      }
       if (id !== "pagination") return;
 
       const buttonPattern = /<button\s+([^>]*)>/g;
@@ -196,16 +412,31 @@ function browserElement(id, initialValue) {
       while ((match = buttonPattern.exec(value))) {
         const attributes = match[1];
         const pageMatch = attributes.match(/data-page="([^"]+)"/);
+        const labelMatch = attributes.match(/aria-label="([^"]+)"/);
         if (!pageMatch) continue;
         const buttonListeners = {};
-        element.buttons.push({
+        const button = {
           dataset: { page: pageMatch[1] },
           disabled: /\bdisabled\b/.test(attributes),
+          ariaLabel: labelMatch ? labelMatch[1] : null,
+          ariaCurrent: /\baria-current="page"/.test(attributes) ? "page" : null,
           addEventListener: (event, listener) => {
             buttonListeners[event] = listener;
           },
-          emit: (event) => buttonListeners[event] && buttonListeners[event](),
-        });
+          emit: (event) => {
+            if (event === "click") button.focus();
+            return buttonListeners[event] && buttonListeners[event]();
+          },
+          focus: () => {
+            focusState.activeElement = button;
+          },
+          getAttribute: (name) => {
+            if (name === "aria-label") return button.ariaLabel;
+            if (name === "aria-current") return button.ariaCurrent;
+            return null;
+          },
+        };
+        element.buttons.push(button);
       }
     },
   });
@@ -213,7 +444,7 @@ function browserElement(id, initialValue) {
 }
 
 function browserDeal(index, postedAt, velocityLabel, voteDelta) {
-  return {
+  return publishedDeal({
     thread_id: String(index),
     title: `Alpha deal ${index}`,
     store: "Example store",
@@ -226,11 +457,74 @@ function browserDeal(index, postedAt, velocityLabel, voteDelta) {
     votes: 100 - index,
     vote_delta: voteDelta,
     velocity_label: velocityLabel,
+  });
+}
+
+function createBrowserApp(browserResponses, options = {}) {
+  const source = fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
+  const requests = queueFetch(browserResponses);
+  const focusState = { activeElement: null };
+  const elements = {
+    search: browserElement("search", "", focusState),
+    sort: browserElement("sort", "velocity", focusState),
+    "posted-window": browserElement("posted-window", "12h", focusState),
+    "deals-list": browserElement("deals-list", "", focusState),
+    pagination: browserElement("pagination", "", focusState),
+    "results-meta": browserElement("results-meta", "", focusState),
+    "last-updated": browserElement("last-updated", "", focusState),
+    "next-refresh": browserElement("next-refresh", "", focusState),
   };
+  const intervalTimers = [];
+  const document = {
+    get activeElement() {
+      return focusState.activeElement;
+    },
+    getElementById: (id) => elements[id],
+    createElement: () => {
+      const value = { innerHTML: "" };
+      Object.defineProperty(value, "textContent", {
+        set: (text) => {
+          value.innerHTML = String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        },
+      });
+      return value;
+    },
+  };
+  const requestTimers = options.requestTimers;
+  elements["deals-list"].setAttribute("aria-busy", "true");
+  elements["deals-list"].innerHTML = '<p class="ticket-state" role="status">Counting the latest tickets...</p>';
+  const context = {
+    AbortController,
+    console: { error: () => {} },
+    Date,
+    document,
+    fetch: requests.fetchImpl,
+    Intl,
+    module: { exports: {} },
+    setInterval: (callback, delay) => {
+      const timer = { callback, delay };
+      intervalTimers.push(timer);
+      return timer;
+    },
+    clearInterval: () => {},
+    setTimeout: requestTimers ? requestTimers.setTimeout : setTimeout,
+    clearTimeout: requestTimers ? requestTimers.clearTimeout : clearTimeout,
+    window: {
+      DATA_CONFIG: config,
+      matchMedia: () => ({ matches: true }),
+      scrollTo: () => {},
+    },
+  };
+
+  vm.runInNewContext(source, context, { filename: "app.js" });
+  return { document, elements, intervalTimers, requests };
 }
 
 async function testBrowserRefreshPreservesControlsAndPage() {
-  const source = fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const firstTime = new Date(Date.now() - 60 * 1000).toISOString();
   const secondTime = new Date(Date.parse(firstTime) + 10 * 60 * 1000).toISOString();
   const postedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -261,56 +555,13 @@ async function testBrowserRefreshPreservesControlsAndPage() {
     )),
     jsonResponse({ scraped_at: secondTime, deals: secondDeals, count: secondDeals.length }),
   ];
-  const requests = queueFetch(browserResponses);
-  const elements = {
-    search: browserElement("search"),
-    sort: browserElement("sort", "velocity"),
-    "posted-window": browserElement("posted-window", "12h"),
-    "deals-list": browserElement("deals-list"),
-    pagination: browserElement("pagination"),
-    "results-meta": browserElement("results-meta"),
-    "last-updated": browserElement("last-updated"),
-    "next-refresh": browserElement("next-refresh"),
-  };
-  const timers = [];
-  const document = {
-    getElementById: (id) => elements[id],
-    createElement: () => {
-      const value = { innerHTML: "" };
-      Object.defineProperty(value, "textContent", {
-        set: (text) => {
-          value.innerHTML = String(text)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-        },
-      });
-      return value;
-    },
-  };
-  const context = {
-    console: { error: () => {} },
-    Date,
-    document,
-    fetch: requests.fetchImpl,
-    Intl,
-    module: { exports: {} },
-    setInterval: (callback, delay) => {
-      const timer = { callback, delay };
-      timers.push(timer);
-      return timer;
-    },
-    clearInterval: () => {},
-    window: {
-      DATA_CONFIG: config,
-      matchMedia: () => ({ matches: true }),
-      scrollTo: () => {},
-    },
-  };
-
-  vm.runInNewContext(source, context, { filename: "app.js" });
-  await new Promise((resolve) => setImmediate(resolve));
+  const requestTimers = manualTimers();
+  const { document, elements, intervalTimers, requests } = createBrowserApp(
+    browserResponses,
+    { requestTimers },
+  );
+  await flush();
+  assert.strictEqual(requestTimers.activeCount(), 0, "initial success timers must be cleaned up");
 
   elements.search.value = "Alpha";
   elements.search.emit("input");
@@ -320,10 +571,34 @@ async function testBrowserRefreshPreservesControlsAndPage() {
   assert.ok(pageTwo, "the initial filtered result must have a second page");
   pageTwo.emit("click");
   assert.strictEqual(elements["results-meta"].textContent, "Showing 26-30 of 30 tickets");
+  assert.strictEqual(
+    elements["results-meta"].focusCount,
+    1,
+    "pagination should focus the results summary before scrolling to the new page",
+  );
+  assert.strictEqual(document.activeElement, elements["results-meta"]);
 
-  const pollTimer = timers.find((timer) => timer.delay === 60000);
+  const focusedBeforeRefresh = elements.pagination.buttons.find(
+    (button) => button.ariaLabel === "Page 2",
+  );
+  assert.ok(focusedBeforeRefresh);
+  focusedBeforeRefresh.focus();
+
+  const pollTimer = intervalTimers.find((timer) => timer.delay === 60000);
   assert.ok(pollTimer, "the browser must poll the publication pointer every minute");
   await pollTimer.callback();
+  assert.strictEqual(requestTimers.activeCount(), 0, "successful poll timers must be cleaned up");
+
+  const focusedAfterRefresh = elements.pagination.buttons.find(
+    (button) => button.ariaLabel === "Page 2",
+  );
+  assert.ok(focusedAfterRefresh);
+  assert.notStrictEqual(focusedAfterRefresh, focusedBeforeRefresh);
+  assert.strictEqual(
+    document.activeElement,
+    focusedAfterRefresh,
+    "a background refresh should focus the equivalent rebuilt pagination control",
+  );
 
   assert.strictEqual(elements.search.value, "Alpha");
   assert.strictEqual(elements.sort.value, "velocity");
@@ -339,14 +614,125 @@ async function testBrowserRefreshPreservesControlsAndPage() {
   const renderedAfterRefresh = elements["deals-list"].innerHTML;
   browserResponses.push(jsonResponse({ error: "temporary outage" }, 503));
   await pollTimer.callback();
+  assert.strictEqual(requestTimers.activeCount(), 0, "failed poll timers must be cleaned up");
   assert.strictEqual(
     elements["deals-list"].innerHTML,
     renderedAfterRefresh,
     "a silent pointer failure must retain the last valid cards",
   );
+
+  browserResponses.push(new Promise(() => {}));
+  const timedOutPoll = pollTimer.callback();
+  assert.strictEqual(requestTimers.activeCount(), 1, "the pending poll must have one timeout");
+  requestTimers.fireNext();
+  assert.strictEqual(requestTimers.activeCount(), 0);
+  await timedOutPoll;
+  assert.strictEqual(requestTimers.activeCount(), 0, "timed-out poll timers must be cleaned up");
+  assert.strictEqual(
+    elements["deals-list"].innerHTML,
+    renderedAfterRefresh,
+    "a silent pointer timeout must retain the last valid cards",
+  );
+
+  const callsBeforeRetry = requests.calls.length;
+  browserResponses.push(jsonResponse(publication(
+    BROWSER_VERSION_TWO,
+    snapshotPath(BROWSER_VERSION_TWO),
+    secondTime,
+    secondDeals.length,
+  )));
+  await pollTimer.callback();
+  assert.strictEqual(requestTimers.activeCount(), 0, "retry poll timers must be cleaned up");
+  assert.strictEqual(
+    requests.calls.length,
+    callsBeforeRetry + 1,
+    "a silent timeout must release the request so the next poll can retry",
+  );
+}
+
+async function testBrowserTimeoutAndRetryPendingState() {
+  const requestTimers = manualTimers();
+  const retryResponse = deferred();
+  const browserResponses = [new Promise(() => {}), retryResponse.promise];
+  const { elements, requests } = createBrowserApp(browserResponses, { requestTimers });
+
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "true");
+  assert.strictEqual(
+    elements["deals-list"].focusCount,
+    0,
+    "the automatic initial load must not steal focus",
+  );
+  assert.strictEqual(requestTimers.activeCount(), 1, "the pending initial load must have one timeout");
+  requestTimers.fireNext();
+  assert.strictEqual(requestTimers.activeCount(), 0);
+  await flush();
+  assert.strictEqual(requestTimers.activeCount(), 0, "initial timeout cleanup must complete");
+
+  assert.strictEqual(elements["results-meta"].textContent, "Counter unavailable");
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "false");
+  assert.ok(elements["deals-list"].retryButton, "an initial timeout must expose Retry");
+  assert.strictEqual(elements["deals-list"].focusCount, 0);
+
+  const retryButton = elements["deals-list"].retryButton;
+  const retryRequest = retryButton.emit("click");
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "true");
+  assert.ok(elements["deals-list"].innerHTML.includes("Counting the latest tickets"));
+  assert.strictEqual(elements["deals-list"].retryButton, null, "Retry must not remain actionable while pending");
+  assert.strictEqual(
+    elements["deals-list"].focusCount,
+    1,
+    "Retry loading should move focus to the stable deals container",
+  );
+  assert.strictEqual(requests.calls.length, 2);
+  assert.strictEqual(requestTimers.activeCount(), 1, "the pending Retry must have one timeout");
+
+  retryResponse.resolve(jsonResponse({ error: "temporary outage" }, 503));
+  await retryRequest;
+  assert.strictEqual(requestTimers.activeCount(), 0, "failed Retry timers must be cleaned up");
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "false");
+  assert.ok(elements["deals-list"].retryButton, "the error action must return when Retry fails");
+}
+
+async function testBrowserSnapshotTimeoutShowsSafeError() {
+  const scrapedAt = new Date(Date.now() - 60 * 1000).toISOString();
+  const requestTimers = manualTimers();
+  const browserResponses = [
+    jsonResponse(publication(VERSION_ONE, snapshotPath(VERSION_ONE), scrapedAt, 1)),
+    new Promise(() => {}),
+  ];
+  const { elements, requests } = createBrowserApp(browserResponses, { requestTimers });
+
+  await flush();
+  assert.strictEqual(requests.calls.length, 2, "the initial load must reach the snapshot request");
+  assert.strictEqual(requestTimers.activeCount(), 1, "only the pending snapshot timeout may remain active");
+  requestTimers.fireNext();
+  assert.strictEqual(requestTimers.activeCount(), 0);
+  await flush();
+  assert.strictEqual(requestTimers.activeCount(), 0, "snapshot timeout cleanup must complete");
+
+  assert.strictEqual(elements["results-meta"].textContent, "Counter unavailable");
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "false");
+  assert.ok(elements["deals-list"].retryButton, "an initial snapshot timeout must expose Retry");
+}
+
+async function testBrowserMalformedSnapshotShowsSafeError() {
+  const scrapedAt = new Date(Date.now() - 60 * 1000).toISOString();
+  const browserResponses = [
+    jsonResponse(publication(VERSION_ONE, snapshotPath(VERSION_ONE), scrapedAt, 1)),
+    jsonResponse({ scraped_at: scrapedAt, deals: [null], count: 1 }),
+  ];
+  const { elements } = createBrowserApp(browserResponses);
+
+  await flush();
+  assert.strictEqual(elements["results-meta"].textContent, "Counter unavailable");
+  assert.strictEqual(elements["deals-list"].attributes["aria-busy"], "false");
+  assert.ok(elements["deals-list"].retryButton, "a malformed initial snapshot must fail safely");
 }
 
 function testValidationHelpers() {
+  const htmlSource = fs.readFileSync(path.join(__dirname, "../src/index.html"), "utf8");
+  assert.match(htmlSource, /id="results-meta"[^>]*tabindex="-1"/);
+  assert.match(htmlSource, /id="deals-list"[^>]*tabindex="-1"/);
   assert.deepStrictEqual(normalizeDataConfig(config), config);
   assert.throws(() => normalizeDataConfig({}), /not configured/);
   assert.throws(() => normalizePublication([]), /unavailable/);
@@ -392,6 +778,34 @@ function testValidationHelpers() {
     "2026-07-18T18:00:00Z",
     1,
   ));
+  const validDeal = publishedDeal();
+  assert.strictEqual(
+    normalizeSnapshot(
+      { scraped_at: "2026-07-18T18:00:00Z", deals: [validDeal], count: 1 },
+      validPublication,
+    ).deals[0],
+    validDeal,
+  );
+  const additiveDeal = publishedDeal({ future_publisher_field: "safe to ignore" });
+  assert.strictEqual(
+    normalizeSnapshot(
+      { scraped_at: "2026-07-18T18:00:00Z", deals: [additiveDeal], count: 1 },
+      validPublication,
+    ).deals[0],
+    additiveDeal,
+    "additive publisher fields must remain compatible with long-lived clients",
+  );
+  const missingTitle = publishedDeal();
+  delete missingTitle.title;
+  for (const invalidDeal of [null, "not-an-object", missingTitle, publishedDeal({ votes: "10" })]) {
+    assert.throws(
+      () => normalizeSnapshot(
+        { scraped_at: "2026-07-18T18:00:00Z", deals: [invalidDeal], count: 1 },
+        validPublication,
+      ),
+      /invalid deal/,
+    );
+  }
   assert.throws(
     () => normalizeSnapshot(
       { scraped_at: "2026-07-18T18:01:00Z", deals: [], count: 0 },
@@ -431,15 +845,31 @@ function testValidationHelpers() {
 }
 
 async function main() {
-  testValidationHelpers();
+  testManualTimersRejectAmbiguousTimeouts();
   await testPublicationLifecycle();
   await testInvalidSnapshotRetriesSameVersion();
   await testConcurrentLoadsShareRequest();
+  await testPublicationTimeoutReleasesRequest();
+  await testSnapshotTimeoutPreservesLastSnapshot();
+  await testMalformedRefreshPreservesLastSnapshot();
   await testBrowserRefreshPreservesControlsAndPage();
+  await testBrowserTimeoutAndRetryPendingState();
+  await testBrowserSnapshotTimeoutShowsSafeError();
+  await testBrowserMalformedSnapshotShowsSafeError();
+  testValidationHelpers();
   console.log("app data loading tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
+const testWatchdog = setTimeout(() => {
+  console.error(new Error("app data loading tests exceeded the 10-second watchdog"));
   process.exitCode = 1;
-});
+}, 10000);
+
+main().then(
+  () => clearTimeout(testWatchdog),
+  (error) => {
+    clearTimeout(testWatchdog);
+    console.error(error);
+    process.exitCode = 1;
+  },
+);

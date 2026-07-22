@@ -110,6 +110,15 @@ class TestEnrichDealsWithVelocity(unittest.TestCase):
         )[0]
         self.assertEqual(deal["discount_percentage"], 50.0)
 
+    def test_multi_buy_discount_uses_offer_amount(self):
+        scraped_at = "2026-06-22T12:00:00Z"
+        deal = enrich_deals_with_velocity(
+            [_deal("1", 10, price="2 for $0.40", original_price="$13")],
+            scraped_at,
+            [_snapshot(scraped_at, **{"1": 10})],
+        )[0]
+        self.assertEqual(deal["discount_percentage"], 96.9)
+
     def test_sorted_by_recent_velocity_descending(self):
         scraped_at = "2026-06-22T13:00:00Z"
         snapshots = [

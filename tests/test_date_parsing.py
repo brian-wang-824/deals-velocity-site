@@ -66,8 +66,13 @@ class TestParseHelpers(unittest.TestCase):
     def test_parse_price_to_float(self):
         self.assertEqual(_parse_price_to_float("$149.99"), 149.99)
         self.assertEqual(_parse_price_to_float("$1,299"), 1299.0)
+        self.assertEqual(_parse_price_to_float("from $20"), 20.0)
         self.assertIsNone(_parse_price_to_float(None))
         self.assertIsNone(_parse_price_to_float("Free"))
+
+    def test_parse_multi_buy_price_uses_offer_amount(self):
+        self.assertEqual(_parse_price_to_float("2 for $0.40"), 0.40)
+        self.assertEqual(_parse_price_to_float("5 for $15"), 15.0)
 
 
 if __name__ == "__main__":
